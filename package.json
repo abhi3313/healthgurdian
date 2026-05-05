@@ -1,0 +1,10 @@
+{
+  "name": "healthguardian-frontend",
+  "private": true,
+  "description": "Wrapper package so npm resolves this folder (not a parent directory). App lives in ./healthguardian.",
+  "scripts": {
+    "dev": "npm run dev --prefix ./healthguardian",
+    "build": "npm run build --prefix ./healthguardian",
+    "preview": "npm run preview --prefix ./healthguardian"
+  }
+}
