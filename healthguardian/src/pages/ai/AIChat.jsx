@@ -20,6 +20,207 @@ const SUGGESTIONS = [
   'What are natural ways to reduce stress?',
 ]
 
+const FENCE_RE = /```(\w+)?\n?([\s\S]*?)```/g
+
+function renderInlineMarkdown(text) {
+  const parts = []
+  const inlineRe = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g
+  let lastIndex = 0
+  let match
+
+  while ((match = inlineRe.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
+
+    const value = match[0]
+    const key = `${match.index}-${value}`
+    if (value.startsWith('`')) {
+      parts.push(
+        <code key={key} className="rounded bg-surface-card px-1 py-0.5 font-mono text-[0.85em] text-accent">
+          {value.slice(1, -1)}
+        </code>,
+      )
+    } else if (value.startsWith('**')) {
+      parts.push(<strong key={key} className="font-semibold text-white">{value.slice(2, -2)}</strong>)
+    } else {
+      parts.push(<em key={key}>{value.slice(1, -1)}</em>)
+    }
+    lastIndex = inlineRe.lastIndex
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+  return parts
+}
+
+function renderInlineWithBreaks(text, keyPrefix) {
+  return text.split('\n').flatMap((line, index, lines) => {
+    const items = [
+      <span key={`${keyPrefix}-line-${index}`}>{renderInlineMarkdown(line)}</span>,
+    ]
+    if (index < lines.length - 1) items.push(<br key={`${keyPrefix}-br-${index}`} />)
+    return items
+  })
+}
+
+function isTableDivider(line) {
+  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line)
+}
+
+function parseTableRow(line) {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map(cell => cell.trim())
+}
+
+function isListLine(line) {
+  return /^\s*([-*+]|[0-9]+\.)\s+/.test(line) || /^\s*[\u2022]\s+/.test(line)
+}
+
+function renderTextBlocks(text, keyPrefix) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const blocks = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    if (!line.trim()) {
+      i += 1
+      continue
+    }
+
+    if (/^\s*---+\s*$/.test(line)) {
+      blocks.push(<hr key={`${keyPrefix}-hr-${i}`} className="my-3 border-surface-border" />)
+      i += 1
+      continue
+    }
+
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line)
+    if (heading) {
+      blocks.push(
+        <p key={`${keyPrefix}-heading-${i}`} className="mt-3 font-semibold text-white first:mt-0">
+          {renderInlineMarkdown(heading[2])}
+        </p>,
+      )
+      i += 1
+      continue
+    }
+
+    if (line.includes('|') && lines[i + 1] && isTableDivider(lines[i + 1])) {
+      const headers = parseTableRow(line)
+      const rows = []
+      i += 2
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
+        rows.push(parseTableRow(lines[i]))
+        i += 1
+      }
+      blocks.push(
+        <div key={`${keyPrefix}-table-${i}`} className="my-3 max-w-full overflow-x-auto rounded-xl border border-surface-border">
+          <table className="w-full min-w-max border-collapse text-left text-xs">
+            <thead className="bg-surface-card text-slate-300">
+              <tr>
+                {headers.map((header, index) => (
+                  <th key={index} className="border-b border-surface-border px-3 py-2 font-semibold">
+                    {renderInlineMarkdown(header)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={rowIndex} className="border-t border-surface-border/60">
+                  {headers.map((_, cellIndex) => (
+                    <td key={cellIndex} className="px-3 py-2 align-top text-slate-300">
+                      {renderInlineMarkdown(row[cellIndex] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      )
+      continue
+    }
+
+    if (isListLine(line)) {
+      const ordered = /^\s*[0-9]+\.\s+/.test(line)
+      const items = []
+      while (i < lines.length && isListLine(lines[i])) {
+        items.push(lines[i].replace(/^\s*([-*+]|[0-9]+\.|[\u2022])\s+/, ''))
+        i += 1
+      }
+      const ListTag = ordered ? 'ol' : 'ul'
+      blocks.push(
+        <ListTag
+          key={`${keyPrefix}-list-${i}`}
+          className={clsx('my-2 space-y-1 pl-5', ordered ? 'list-decimal' : 'list-disc')}
+        >
+          {items.map((item, index) => (
+            <li key={index} className="pl-1">
+              {renderInlineWithBreaks(item, `${keyPrefix}-list-${i}-${index}`)}
+            </li>
+          ))}
+        </ListTag>,
+      )
+      continue
+    }
+
+    const paragraph = [line]
+    i += 1
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^\s*---+\s*$/.test(lines[i]) &&
+      !/^(#{1,6})\s+/.test(lines[i]) &&
+      !(lines[i].includes('|') && lines[i + 1] && isTableDivider(lines[i + 1])) &&
+      !isListLine(lines[i])
+    ) {
+      paragraph.push(lines[i])
+      i += 1
+    }
+
+    blocks.push(
+      <p key={`${keyPrefix}-p-${i}`} className="my-2 first:mt-0 last:mb-0">
+        {renderInlineWithBreaks(paragraph.join('\n'), `${keyPrefix}-p-${i}`)}
+      </p>,
+    )
+  }
+
+  return blocks
+}
+
+function FormattedMessage({ content }) {
+  const text = String(content ?? '')
+  const blocks = []
+  let lastIndex = 0
+  let match
+
+  FENCE_RE.lastIndex = 0
+  while ((match = FENCE_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      blocks.push(...renderTextBlocks(text.slice(lastIndex, match.index), `text-${lastIndex}`))
+    }
+    blocks.push(
+      <pre
+        key={`code-${match.index}`}
+        className="my-3 max-h-96 max-w-full overflow-auto rounded-xl border border-surface-border bg-surface-card p-3 text-xs leading-relaxed"
+      >
+        <code className="font-mono text-slate-200">{match[2].trimEnd()}</code>
+      </pre>,
+    )
+    lastIndex = FENCE_RE.lastIndex
+  }
+
+  if (lastIndex < text.length) {
+    blocks.push(...renderTextBlocks(text.slice(lastIndex), `text-${lastIndex}`))
+  }
+
+  return <div className="max-w-full overflow-visible break-words">{blocks.length ? blocks : text}</div>
+}
+
 function Message({ msg }) {
   const isUser = msg.role === 'user'
   return (
@@ -27,7 +228,7 @@ function Message({ msg }) {
       initial={{ opacity: 0, y: 12, scale: 0.97 }}
       animate={{ opacity: 1, y: 0,  scale: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-      className={clsx('flex gap-3', isUser ? 'flex-row-reverse' : 'flex-row')}
+      className={clsx('flex gap-3 overflow-visible', isUser ? 'flex-row-reverse' : 'flex-row')}
     >
       {/* Avatar */}
       <div className={clsx(
@@ -43,9 +244,9 @@ function Message({ msg }) {
       </div>
 
       {/* Bubble */}
-      <div className={clsx('max-w-[75%] space-y-1', isUser ? 'items-end' : 'items-start', 'flex flex-col')}>
+      <div className={clsx('min-w-0 max-w-[75%] space-y-1', isUser ? 'items-end' : 'items-start', 'flex flex-col')}>
         <div className={isUser ? 'chat-bubble-user' : 'chat-bubble-ai'}>
-          {msg.content}
+          <FormattedMessage content={msg.content} />
         </div>
         <p className="text-[10px] text-slate-600 px-1">{formatDateTime(msg.timestamp)}</p>
       </div>

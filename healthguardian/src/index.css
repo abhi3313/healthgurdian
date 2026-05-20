@@ -68,8 +68,8 @@
 
   .skeleton { @apply rounded-xl bg-surface-muted animate-pulse; }
 
-  .chat-bubble-user { @apply ml-auto max-w-[80%] bg-primary-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed; }
-  .chat-bubble-ai   { @apply mr-auto max-w-[80%] bg-surface-muted border border-surface-border text-slate-200 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed; }
+  .chat-bubble-user { @apply ml-auto max-w-full overflow-visible break-words bg-primary-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed; }
+  .chat-bubble-ai   { @apply mr-auto max-w-full overflow-visible break-words bg-surface-muted border border-surface-border text-slate-200 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed; }
 }
 
 /* ── Utilities ────────────────────────────────────────── */
