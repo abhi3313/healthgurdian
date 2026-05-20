@@ -15,14 +15,7 @@ const api = axios.create({
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 })
-// hatana hai
-console.log("API URL:", import.meta.env.VITE_API_BASE_URL);
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
-});
 
 // Attach token on every request
 api.interceptors.request.use(
