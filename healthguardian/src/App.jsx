@@ -64,7 +64,6 @@ export default function App() {
       }>
         <Route index                 element={<DoctorDashboard />} />
         <Route path="patients"       element={<PatientList />} />
-        <Route path="ai-chat"        element={<AIChat />} />
         {/* Access Control */}
         <Route path="request-access" element={<RequestAccess />} />
         <Route path="my-requests"    element={<MyAccessRequests />} />

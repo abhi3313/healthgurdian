@@ -23,6 +23,8 @@ export default function Settings() {
     address: '',
     allergies: '',
     chronicConditions: '',
+    importantMedicalConditions: '',
+    emergencyNotes: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
     specialization: '',
@@ -47,6 +49,8 @@ export default function Settings() {
       address: user.address ?? '',
       allergies: Array.isArray(user.allergies) ? user.allergies.join(', ') : '',
       chronicConditions: Array.isArray(user.chronicConditions) ? user.chronicConditions.join(', ') : '',
+      importantMedicalConditions: Array.isArray(user.importantMedicalConditions) ? user.importantMedicalConditions.join(', ') : '',
+      emergencyNotes: user.emergencyNotes ?? '',
       emergencyContactName: user.emergencyContact?.name ?? '',
       emergencyContactPhone: user.emergencyContact?.phone ?? '',
       specialization: user.specialization ?? '',
@@ -77,6 +81,8 @@ export default function Settings() {
         payload.address = profile.address ?? ''
         payload.allergies = parseCsvList(profile.allergies)
         payload.chronicConditions = parseCsvList(profile.chronicConditions)
+        payload.importantMedicalConditions = parseCsvList(profile.importantMedicalConditions)
+        payload.emergencyNotes = profile.emergencyNotes ?? ''
         payload.emergencyContact = {
           name: (profile.emergencyContactName || '').trim(),
           phone: (profile.emergencyContactPhone || '').trim(),
@@ -236,6 +242,24 @@ export default function Settings() {
                 value={profile.chronicConditions}
                 onChange={e => set('chronicConditions', e.target.value)}
                 placeholder="Diabetes Type 2, Hypertension"
+              />
+            </div>
+            <div>
+              <label className="label">Important medical conditions (comma separated)</label>
+              <input
+                className="input"
+                value={profile.importantMedicalConditions}
+                onChange={e => set('importantMedicalConditions', e.target.value)}
+                placeholder="Severe asthma, Heart condition, Seizure disorder"
+              />
+            </div>
+            <div>
+              <label className="label">Emergency notes</label>
+              <textarea
+                className="input resize-none min-h-[90px]"
+                value={profile.emergencyNotes}
+                onChange={e => set('emergencyNotes', e.target.value)}
+                placeholder="Critical instructions responders should know"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -2,9 +2,10 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   RiRobotLine, RiSendPlaneFill, RiUserLine,
-  RiDeleteBinLine, RiSparklingLine, RiRefreshLine,
+  RiAddLine, RiChat3Line, RiDeleteBinLine, RiSparklingLine, RiRefreshLine,
 } from 'react-icons/ri'
 import { aiService } from '../../services/aiService'
+import { conversationService } from '../../services/conversationService'
 import { unwrapData } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateTime } from '../../utils/helpers'
@@ -279,7 +280,7 @@ function TypingIndicator() {
   )
 }
 
-export default function AIChat() {
+function LegacyAIChat() {
   const { user } = useAuth()
   const [messages, setMessages] = useState([
     {
@@ -453,6 +454,398 @@ export default function AIChat() {
           AI responses are for informational purposes only. Always consult a healthcare professional.
         </p>
       </div>
+    </div>
+  )
+}
+
+function welcomeMessage(user) {
+  return {
+    role: 'assistant',
+    content: `Hello ${user?.name?.split(' ')[0] ?? 'there'}! I'm your HealthGuardian AI assistant. I can help you understand health information, explain medical terms, and answer health-related questions. How can I assist you today?`,
+    timestamp: new Date().toISOString(),
+  }
+}
+
+function normalizeStoredMessage(message) {
+  return {
+    id: message.messageId || message._id,
+    role: message.role,
+    content: message.message ?? message.content ?? '',
+    timestamp: message.timestamp || message.createdAt || new Date().toISOString(),
+  }
+}
+
+function conversationTime(conversation) {
+  const date = conversation?.updatedAt || conversation?.lastMessageAt || conversation?.createdAt
+  return date ? formatDateTime(date) : ''
+}
+
+export default function AIChat() {
+  const { user } = useAuth()
+  const [messages, setMessages] = useState(() => [welcomeMessage(user)])
+  const [conversations, setConversations] = useState([])
+  const [activeSessionId, setActiveSessionId] = useState('')
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [conversationLoading, setConversationLoading] = useState(false)
+  const [deletingSessionId, setDeletingSessionId] = useState('')
+  const bottomRef = useRef(null)
+  const inputRef = useRef(null)
+
+  const refreshConversations = useCallback(async () => {
+    const res = await conversationService.getConversations()
+    const payload = unwrapData(res) ?? {}
+    setConversations(payload.conversations ?? payload.sessions ?? [])
+  }, [])
+
+  const loadConversationById = useCallback(async (sessionId) => {
+    if (!sessionId) return
+    setConversationLoading(true)
+    try {
+      const res = await conversationService.loadConversation(sessionId)
+      const payload = unwrapData(res) ?? {}
+      const storedMessages = (payload.messages ?? []).map(normalizeStoredMessage)
+      setActiveSessionId(sessionId)
+      setMessages(storedMessages.length ? storedMessages : [welcomeMessage(user)])
+      setTimeout(() => inputRef.current?.focus(), 100)
+    } catch (err) {
+      toast.error('Could not load that conversation')
+    } finally {
+      setConversationLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function initConversations() {
+      setHistoryLoading(true)
+      try {
+        const res = await conversationService.getConversations()
+        const payload = unwrapData(res) ?? {}
+        const list = payload.conversations ?? payload.sessions ?? []
+        if (cancelled) return
+
+        setConversations(list)
+        if (list[0]?.sessionId) {
+          await loadConversationById(list[0].sessionId)
+        } else {
+          setMessages([welcomeMessage(user)])
+        }
+      } catch (err) {
+        if (!cancelled) toast.error('Could not load chat history')
+      } finally {
+        if (!cancelled) setHistoryLoading(false)
+      }
+    }
+
+    initConversations()
+    return () => { cancelled = true }
+  }, [loadConversationById, user])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading, conversationLoading])
+
+  const startNewChat = useCallback(async () => {
+    if (loading) return
+
+    try {
+      const res = await conversationService.createConversation()
+      const payload = unwrapData(res) ?? {}
+      const conversation = payload.conversation
+      setActiveSessionId(conversation?.sessionId || '')
+      setMessages([welcomeMessage(user)])
+      setInput('')
+      await refreshConversations()
+      setTimeout(() => inputRef.current?.focus(), 100)
+    } catch (err) {
+      toast.error('Could not start a new chat')
+    }
+  }, [loading, refreshConversations, user])
+
+  const deleteConversationById = useCallback(async (sessionId, event) => {
+    event?.stopPropagation()
+    if (!sessionId || loading || deletingSessionId) return
+
+    const confirmed = window.confirm('Delete this chat history? This cannot be undone.')
+    if (!confirmed) return
+
+    setDeletingSessionId(sessionId)
+    try {
+      await conversationService.deleteConversation(sessionId)
+      setConversations(prev => prev.filter(conversation => conversation.sessionId !== sessionId))
+
+      if (activeSessionId === sessionId) {
+        setActiveSessionId('')
+        setMessages([welcomeMessage(user)])
+        setInput('')
+      }
+
+      await refreshConversations()
+      toast.success('Chat history deleted')
+    } catch (err) {
+      toast.error('Could not delete chat history')
+    } finally {
+      setDeletingSessionId('')
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [activeSessionId, deletingSessionId, loading, refreshConversations, user])
+
+  const sendMessage = useCallback(async (text) => {
+    const content = (text ?? input).trim()
+    if (!content || loading) return
+
+    const welcomeContent = welcomeMessage(user).content
+    const priorMessages = messages.filter(m => !(m.role === 'assistant' && m.content === welcomeContent))
+    const userMsg = { role: 'user', content, timestamp: new Date().toISOString() }
+    setMessages(prev => [...prev, userMsg])
+    setInput('')
+    setLoading(true)
+
+    try {
+      const history = priorMessages.map(m => ({ role: m.role, content: m.content }))
+      const res = await aiService.query(content, history, activeSessionId || undefined)
+      const payload = unwrapData(res) ?? {}
+      const replyText = payload.reply ?? res.data?.data?.reply
+      const aiMsg = payload.messages?.assistant
+        ? normalizeStoredMessage(payload.messages.assistant)
+        : {
+            role: 'assistant',
+            content: replyText && String(replyText).trim()
+              ? replyText
+              : 'I apologize, I could not generate a response. Please try again.',
+            timestamp: new Date().toISOString(),
+          }
+
+      setActiveSessionId(payload.sessionId || activeSessionId)
+      setMessages(prev => [...prev, aiMsg])
+      await refreshConversations()
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: err.response?.data?.message || 'Sorry, I encountered an error. Please check your connection and try again.',
+        timestamp: new Date().toISOString(),
+        error: true,
+      }])
+    } finally {
+      setLoading(false)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [activeSessionId, input, loading, messages, refreshConversations, user])
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  const hasOnlyWelcome = messages.length <= 1 && !messages.some(m => m.role === 'user')
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] max-w-7xl mx-auto gap-4">
+      <aside className="hidden md:flex w-72 shrink-0 flex-col rounded-2xl border border-surface-border bg-surface-card p-3 shadow-card">
+        <button
+          onClick={startNewChat}
+          disabled={loading}
+          className="btn-primary mb-3 flex items-center justify-center gap-2 text-sm"
+        >
+          <RiAddLine /> New Chat
+        </button>
+
+        <div className="mb-2 px-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+          Conversations
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto no-scrollbar">
+          {historyLoading ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map(i => <div key={i} className="skeleton h-14" />)}
+            </div>
+          ) : conversations.length ? (
+            conversations.map(conversation => (
+              <div
+                key={conversation.sessionId}
+                className={clsx(
+                  'group flex w-full items-stretch overflow-hidden rounded-xl border transition-all',
+                  activeSessionId === conversation.sessionId
+                    ? 'border-primary-600/40 bg-primary-600/15'
+                    : 'border-transparent bg-surface-muted/50 hover:border-surface-border hover:bg-surface-muted',
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => loadConversationById(conversation.sessionId)}
+                  disabled={deletingSessionId === conversation.sessionId}
+                  className="flex min-w-0 flex-1 items-start gap-2 p-3 text-left disabled:opacity-60"
+                >
+                  <RiChat3Line className="mt-0.5 shrink-0 text-slate-500" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-white">{conversation.title || 'New chat'}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-500">
+                      Updated {conversationTime(conversation)}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => deleteConversationById(conversation.sessionId, event)}
+                  disabled={loading || deletingSessionId === conversation.sessionId}
+                  title="Delete chat history"
+                  aria-label={`Delete ${conversation.title || 'chat history'}`}
+                  className="flex w-10 shrink-0 items-center justify-center text-slate-500 transition-colors hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RiDeleteBinLine />
+                </button>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-xl border border-dashed border-surface-border p-4 text-sm text-slate-500">
+              Your saved chats will appear here.
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <main className="flex min-w-0 flex-1 flex-col">
+        <div className="mb-4 flex shrink-0 flex-col gap-3 md:hidden">
+          <button onClick={startNewChat} disabled={loading} className="btn-primary flex items-center justify-center gap-2 text-sm">
+            <RiAddLine /> New Chat
+          </button>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {conversations.map(conversation => (
+              <div
+                key={conversation.sessionId}
+                className={clsx(
+                  'flex shrink-0 items-center overflow-hidden rounded-xl border text-xs',
+                  activeSessionId === conversation.sessionId
+                    ? 'border-primary-600/40 bg-primary-600/15 text-white'
+                    : 'border-surface-border bg-surface-card text-slate-400',
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => loadConversationById(conversation.sessionId)}
+                  disabled={deletingSessionId === conversation.sessionId}
+                  className="max-w-[12rem] truncate px-3 py-2 text-left disabled:opacity-60"
+                >
+                  {conversation.title || 'New chat'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => deleteConversationById(conversation.sessionId, event)}
+                  disabled={loading || deletingSessionId === conversation.sessionId}
+                  title="Delete chat history"
+                  aria-label={`Delete ${conversation.title || 'chat history'}`}
+                  className="flex h-full w-9 items-center justify-center border-l border-surface-border text-slate-500 hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RiDeleteBinLine />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-4 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent/20 to-primary-600/20 border border-accent/30 flex items-center justify-center">
+              <RiRobotLine className="text-accent text-xl" />
+            </div>
+            <div>
+              <h1 className="font-display font-bold text-white">AI Health Assistant</h1>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse-slow" />
+                <p className="text-xs text-slate-400">Online - Powered by HealthGuardian AI</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 card overflow-y-auto no-scrollbar space-y-4 p-5">
+          <AnimatePresence initial={false}>
+            {conversationLoading
+              ? <div className="skeleton h-20" />
+              : messages.map((msg, i) => <Message key={msg.id || i} msg={msg} />)
+            }
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {loading && <TypingIndicator />}
+          </AnimatePresence>
+
+          <div ref={bottomRef} />
+        </div>
+
+        <AnimatePresence>
+          {hasOnlyWelcome && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mt-4 shrink-0"
+            >
+              <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
+                <RiSparklingLine className="text-accent" /> Try asking
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {SUGGESTIONS.map((s, i) => (
+                  <motion.button
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                    onClick={() => sendMessage(s)}
+                    className="text-xs px-3 py-1.5 rounded-xl bg-surface-muted border border-surface-border text-slate-400
+                               hover:text-white hover:border-primary-600/40 transition-all"
+                  >
+                    {s}
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="mt-4 shrink-0">
+          <div className="flex items-end gap-3 p-3 bg-surface-card border border-surface-border rounded-2xl focus-within:border-primary-500/50 transition-colors">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Ask me anything about your health..."
+              rows={1}
+              className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none resize-none max-h-32 leading-relaxed"
+              style={{ minHeight: '24px' }}
+              onInput={e => {
+                e.target.style.height = 'auto'
+                e.target.style.height = e.target.scrollHeight + 'px'
+              }}
+            />
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => sendMessage()}
+              disabled={!input.trim() || loading}
+              className={clsx(
+                'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all',
+                input.trim() && !loading
+                  ? 'bg-primary-600 hover:bg-primary-500 text-white shadow-glow-blue'
+                  : 'bg-surface-muted text-slate-600 cursor-not-allowed',
+              )}
+            >
+              {loading
+                ? <RiRefreshLine className="text-lg animate-spin" />
+                : <RiSendPlaneFill className="text-sm" />
+              }
+            </motion.button>
+          </div>
+          <p className="text-[10px] text-slate-700 text-center mt-2">
+            AI responses are for informational purposes only. Always consult a healthcare professional.
+          </p>
+        </div>
+      </main>
     </div>
   )
 }

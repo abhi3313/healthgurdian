@@ -102,9 +102,15 @@ export default function Register() {
       >
         {/* Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-accent shadow-glow mb-4">
-            <Logo className="w-9 h-9" />
-          </div>
+          <Link
+            to="/"
+            aria-label="Go to HealthGuardian landing page"
+            className="inline-flex rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 focus:ring-offset-surface"
+          >
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-accent shadow-glow mb-4 transition-transform hover:scale-105">
+              <Logo className="w-9 h-9" />
+            </div>
+          </Link>
           <h1 className="font-display text-2xl font-bold text-white">Create Account</h1>
           <p className="text-slate-400 mt-1 text-sm">Join HealthGuardian today</p>
         </div>

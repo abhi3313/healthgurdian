@@ -1,14 +1,11 @@
-import { RiMenu2Line, RiNotification3Line, RiSearchLine, RiCalendarLine, RiFileList3Line, RiUploadCloud2Line } from 'react-icons/ri'
-import { motion } from 'framer-motion'
+import { RiMenu2Line, RiSearchLine, RiCalendarLine, RiFileList3Line, RiUploadCloud2Line } from 'react-icons/ri'
 import { useAuth } from '../../context/AuthContext'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDate } from '../../utils/helpers'
 import { useTheme } from '../../context/ThemeContext'
-import { notificationService } from '../../services/notificationService'
 import { patientService } from '../../services/patientService'
 import { unwrapData } from '../../services/api'
-import toast from 'react-hot-toast'
 
 export default function TopBar({ onToggleSidebar, role }) {
   const { user } = useAuth()
@@ -18,16 +15,7 @@ export default function TopBar({ onToggleSidebar, role }) {
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [loading, setLoading] = useState(false)
   const searchWrapRef = useRef(null)
-
-  useEffect(() => {
-    fetchUnreadCount()
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000)
-    return () => clearInterval(interval)
-  }, [])
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -151,20 +139,6 @@ export default function TopBar({ onToggleSidebar, role }) {
     }
   }
 
-  const fetchUnreadCount = async () => {
-    try {
-      setLoading(true)
-      const res = await notificationService.getUnreadCount()
-      if (res.data?.success) {
-        setUnreadCount(res.data?.data?.unreadCount || 0)
-      }
-    } catch (error) {
-      console.error('Failed to fetch unread notifications:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const greeting = () => {
     const h = new Date().getHours()
     if (h < 12) return 'Good morning'
@@ -261,21 +235,6 @@ export default function TopBar({ onToggleSidebar, role }) {
         >
           <span className="text-base">{isDark ? '☀' : '☾'}</span>
         </button>
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={`relative p-2 rounded-xl transition-all ${
-            isDark
-              ? 'text-slate-300 hover:text-white hover:bg-surface-muted'
-              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200 border border-slate-300 bg-white/90'
-          }`}
-          onClick={fetchUnreadCount}
-          title={unreadCount > 0 ? `${unreadCount} unread notification(s)` : 'No new notifications'}
-        >
-          <RiNotification3Line className="text-xl" />
-          {unreadCount > 0 && (
-            <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full ring-2 ring-surface-card" />
-          )}
-        </motion.button>
       </div>
     </header>
   )

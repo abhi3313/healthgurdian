@@ -113,9 +113,9 @@ export default function MyAppointments() {
   }
 
   const confirmCancel = (apt) => {
-    const reason = window.prompt('Cancel reason (optional):') ?? ''
+    const reason = window.prompt('Cancel reason (optional):')
     if (reason === null) return
-    cancelMut.mutate({ id: apt._id, reason })
+    cancelMut.mutate({ id: apt._id, reason: reason || '' })
   }
 
   if (isLoading) return <FullPageLoader message="Loading appointments…" />
@@ -251,6 +251,7 @@ export default function MyAppointments() {
                 value={form.date}
                 onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                 className="input"
+                min={new Date().toISOString().split('T')[0]}
                 required
               />
             </div>

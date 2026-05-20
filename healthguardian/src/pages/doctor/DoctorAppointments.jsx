@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   RiCalendarLine, RiStethoscopeLine, RiFileList3Line,
-  RiHeartPulseLine, RiChat3Line,
+  RiHeartPulseLine, RiChat3Line, RiUploadCloud2Line,
 } from 'react-icons/ri'
 import { doctorService } from '../../services/doctorService'
 import { unwrapData } from '../../services/api'
@@ -22,12 +22,13 @@ const EMPTY_RX = {
 
 export default function DoctorAppointments() {
   const qc = useQueryClient()
-  const [modal, setModal] = useState(null) // 'record' | 'rx' | 'note' | null
+  const [modal, setModal] = useState(null) // 'record' | 'rx' | 'note' | 'report' | null
   const [ctxApt, setCtxApt] = useState(null)
 
   const [recordForm, setRecordForm] = useState({ type: 'General Checkup', description: '' })
   const [rxForm, setRxForm] = useState(EMPTY_RX)
   const [noteForm, setNoteForm] = useState({ content: '' })
+  const [reportForm, setReportForm] = useState({ file: null, tag: '', description: '', category: 'other' })
   const [notesDraft, setNotesDraft] = useState({}) // aptId -> string for inline doctor notes
 
   const { data, isLoading } = useQuery({
@@ -79,6 +80,17 @@ export default function DoctorAppointments() {
     onError: (err) => toast.error(err.response?.data?.message ?? 'Could not add note'),
   })
 
+  const reportMut = useMutation({
+    mutationFn: ({ patientId, formData }) => doctorService.uploadPatientReport(patientId, formData),
+    onSuccess: (res) => {
+      toast.success(res.data?.message ?? 'Report uploaded')
+      closeClinical()
+      qc.invalidateQueries({ queryKey: ['doctor-appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-patients'] })
+    },
+    onError: (err) => toast.error(err.response?.data?.message ?? 'Could not upload report'),
+  })
+
   const appointments = data?.appointments ?? []
 
   const closeClinical = () => {
@@ -87,6 +99,7 @@ export default function DoctorAppointments() {
     setRecordForm({ type: 'General Checkup', description: '' })
     setRxForm(EMPTY_RX)
     setNoteForm({ content: '' })
+    setReportForm({ file: null, tag: '', description: '', category: 'other' })
   }
 
   const openClinical = (kind, apt) => {
@@ -146,6 +159,21 @@ export default function DoctorAppointments() {
     const pid = patientId(ctxApt)
     if (!pid || !noteForm.content.trim()) return toast.error('Note content is required')
     noteMut.mutate({ patientId: pid, payload: { content: noteForm.content.trim() } })
+  }
+
+  const handleReportSubmit = (e) => {
+    e.preventDefault()
+    const pid = patientId(ctxApt)
+    if (!pid) return toast.error('Missing patient')
+    if (!reportForm.file) return toast.error('Choose a report file')
+
+    const formData = new FormData()
+    formData.append('report', reportForm.file)
+    formData.append('tag', reportForm.tag.trim() || 'Doctor Report')
+    formData.append('description', reportForm.description.trim())
+    formData.append('category', reportForm.category || 'other')
+
+    reportMut.mutate({ patientId: pid, formData })
   }
 
   if (isLoading) return <FullPageLoader message="Loading appointments…" />
@@ -272,6 +300,13 @@ export default function DoctorAppointments() {
                       className="flex items-center gap-1.5 text-xs py-2 px-3 rounded-lg border border-surface-border text-slate-300 hover:bg-surface-muted"
                     >
                       <RiChat3Line /> Quick note
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openClinical('report', apt)}
+                      className="flex items-center gap-1.5 text-xs py-2 px-3 rounded-lg border border-surface-border text-slate-300 hover:bg-surface-muted"
+                    >
+                      <RiUploadCloud2Line /> Upload report
                     </button>
                   </div>
                 )}
@@ -408,6 +443,62 @@ export default function DoctorAppointments() {
           <div className="flex gap-3">
             <button type="button" onClick={closeClinical} className="btn-ghost flex-1 border border-surface-border">Cancel</button>
             <button type="submit" disabled={noteMut.isPending} className="btn-primary flex-1">Save note</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={modal === 'report'} onClose={closeClinical} title="Upload patient report" size="md">
+        <form onSubmit={handleReportSubmit} className="space-y-4">
+          <p className="text-sm text-slate-500">Patient: <strong className="text-white">{ctxApt?.patient?.name}</strong></p>
+          <div>
+            <label className="label">Report file *</label>
+            <input
+              type="file"
+              accept=".pdf,image/jpeg,image/png,image/webp"
+              onChange={(e) => setReportForm((f) => ({ ...f, file: e.target.files?.[0] || null }))}
+              className="input file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+              required
+            />
+            <p className="text-xs text-slate-600 mt-1">PDF, JPG, PNG, or WEBP up to the configured upload limit.</p>
+          </div>
+          <div>
+            <label className="label">Tag</label>
+            <input
+              value={reportForm.tag}
+              onChange={(e) => setReportForm((f) => ({ ...f, tag: e.target.value }))}
+              className="input"
+              placeholder="Lab report, X-Ray, discharge summary"
+            />
+          </div>
+          <div>
+            <label className="label">Category</label>
+            <select
+              value={reportForm.category}
+              onChange={(e) => setReportForm((f) => ({ ...f, category: e.target.value }))}
+              className="input"
+            >
+              <option value="lab">Lab</option>
+              <option value="imaging">Imaging</option>
+              <option value="prescription">Prescription</option>
+              <option value="insurance">Insurance</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <textarea
+              value={reportForm.description}
+              onChange={(e) => setReportForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+              className="input resize-none"
+              placeholder="Short clinical context for this report"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={closeClinical} className="btn-ghost flex-1 border border-surface-border">Cancel</button>
+            <button type="submit" disabled={reportMut.isPending} className="btn-primary flex-1">
+              {reportMut.isPending ? 'Uploading...' : 'Upload report'}
+            </button>
           </div>
         </form>
       </Modal>

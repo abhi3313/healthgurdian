@@ -1,23 +1,34 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   RiSearchLine, RiUserLine, RiEyeLine,
   RiHeartPulseLine, RiShieldCheckLine, RiArrowRightLine,
+  RiUploadCloud2Line, RiAddLine,
 } from 'react-icons/ri'
 import { doctorService } from '../../services/doctorService'
 import { unwrapData } from '../../services/api'
 import { FullPageLoader } from '../../components/common/LoadingSpinner'
 import { formatDate, getInitials, getAvatarColor, statusColor, timeAgo } from '../../utils/helpers'
 import Modal from '../../components/ui/Modal'
+import toast from 'react-hot-toast'
 import clsx from 'clsx'
+
+const EMPTY_RX = {
+  diagnosis: '',
+  instructions: '',
+  medications: [{ name: '', dosage: '', frequency: '', duration: '' }],
+}
 
 export default function PatientList() {
   const qc                        = useQueryClient()
   const [search, setSearch]       = useState('')
   const [selected, setSelected]   = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [actionModal, setActionModal] = useState(null)
+  const [rxForm, setRxForm] = useState(EMPTY_RX)
+  const [reportForm, setReportForm] = useState({ file: null, tag: '', description: '', category: 'other' })
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['doctor-patients'],
@@ -38,8 +49,39 @@ export default function PatientList() {
 
   const { data: patientDetail, isLoading: loadingDetail } = useQuery({
     queryKey: ['doctor-patient', selected?._id],
-    queryFn: () => doctorService.getPatientRecords(selected._id).then(unwrapData),
+    queryFn: () => doctorService.getPatient(selected._id).then(unwrapData),
     enabled: !!selected?._id,
+  })
+
+  const { data: reportsData } = useQuery({
+    queryKey: ['doctor-patient-reports', selected?._id],
+    queryFn: () => doctorService.getPatientReports(selected._id).then(unwrapData),
+    enabled: !!selected?._id && modalOpen,
+  })
+
+  const rxMut = useMutation({
+    mutationFn: ({ patientId, payload }) => doctorService.addPrescription(patientId, payload),
+    onSuccess: (res) => {
+      toast.success(res.data?.message ?? 'Prescription created')
+      setActionModal(null)
+      setRxForm(EMPTY_RX)
+      qc.invalidateQueries({ queryKey: ['doctor-patient', selected?._id] })
+      qc.invalidateQueries({ queryKey: ['doctor-patients'] })
+      qc.invalidateQueries({ queryKey: ['doctor-dashboard'] })
+    },
+    onError: (err) => toast.error(err.response?.data?.message ?? 'Could not create prescription'),
+  })
+
+  const reportMut = useMutation({
+    mutationFn: ({ patientId, formData }) => doctorService.uploadPatientReport(patientId, formData),
+    onSuccess: (res) => {
+      toast.success(res.data?.message ?? 'Report uploaded')
+      setActionModal(null)
+      setReportForm({ file: null, tag: '', description: '', category: 'other' })
+      qc.invalidateQueries({ queryKey: ['doctor-patient-reports', selected?._id] })
+      qc.invalidateQueries({ queryKey: ['doctor-patient', selected?._id] })
+    },
+    onError: (err) => toast.error(err.response?.data?.message ?? 'Could not upload report'),
   })
 
   const patients = data?.patients ?? []
@@ -49,6 +91,47 @@ export default function PatientList() {
   )
 
   const openDetail = (p) => { setSelected(p); setModalOpen(true) }
+
+  const closeAction = () => {
+    setActionModal(null)
+    setRxForm(EMPTY_RX)
+    setReportForm({ file: null, tag: '', description: '', category: 'other' })
+  }
+
+  const handleRxSubmit = (e) => {
+    e.preventDefault()
+    if (!selected?._id) return toast.error('Choose a patient first')
+    const meds = rxForm.medications.filter(m => m.name?.trim())
+    if (!rxForm.diagnosis.trim() || meds.length === 0) {
+      return toast.error('Diagnosis and at least one medication are required')
+    }
+    rxMut.mutate({
+      patientId: selected._id,
+      payload: {
+        diagnosis: rxForm.diagnosis.trim(),
+        instructions: rxForm.instructions.trim(),
+        medications: meds.map(m => ({
+          name: m.name.trim(),
+          dosage: m.dosage.trim(),
+          frequency: m.frequency.trim(),
+          duration: m.duration.trim(),
+        })),
+      },
+    })
+  }
+
+  const handleReportSubmit = (e) => {
+    e.preventDefault()
+    if (!selected?._id) return toast.error('Choose a patient first')
+    if (!reportForm.file) return toast.error('Choose a report file')
+
+    const formData = new FormData()
+    formData.append('report', reportForm.file)
+    formData.append('tag', reportForm.tag.trim() || 'Doctor Report')
+    formData.append('description', reportForm.description.trim())
+    formData.append('category', reportForm.category || 'other')
+    reportMut.mutate({ patientId: selected._id, formData })
+  }
 
   const emptyList = patients.length === 0
 
@@ -175,7 +258,7 @@ export default function PatientList() {
       )}
 
       {/* Patient Detail Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={selected?.name ?? 'Patient Detail'} size="lg">
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); closeAction() }} title={selected?.name ?? 'Patient Detail'} size="lg">
         {loadingDetail ? (
           <div className="flex justify-center py-10">
             <div className="w-8 h-8 border-2 border-surface-border border-t-primary-500 rounded-full animate-spin" />
@@ -187,7 +270,7 @@ export default function PatientList() {
               <div className={clsx('w-14 h-14 rounded-xl bg-gradient-to-br flex items-center justify-center text-white font-bold text-lg', getAvatarColor(selected?.name ?? ''))}>
                 {getInitials(selected?.name ?? '')}
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="font-bold text-white text-lg">{selected?.name}</p>
                 <p className="text-slate-500 text-sm">{selected?.email}</p>
                 <div className="flex gap-2 mt-1">
@@ -195,6 +278,23 @@ export default function PatientList() {
                   {selected?.phone     && <span className="badge badge-info">{selected.phone}</span>}
                 </div>
               </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActionModal('rx')}
+                className="btn-primary flex items-center gap-2 px-3 py-2 text-xs"
+              >
+                <RiAddLine /> Add prescription
+              </button>
+              <button
+                type="button"
+                onClick={() => setActionModal('report')}
+                className="rounded-lg border border-surface-border px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-surface-muted flex items-center gap-2"
+              >
+                <RiUploadCloud2Line /> Upload report
+              </button>
             </div>
 
             {/* Records */}
@@ -220,8 +320,154 @@ export default function PatientList() {
                 </div>
               )}
             </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <h3 className="font-display font-bold text-white mb-3">Prescriptions</h3>
+                {!patientDetail?.activePrescriptions?.length ? (
+                  <p className="text-slate-600 text-sm py-4">No active prescriptions found</p>
+                ) : (
+                  <div className="space-y-2">
+                    {patientDetail.activePrescriptions.map((rx, i) => (
+                      <div key={rx._id ?? i} className="rounded-xl border border-surface-border bg-surface-muted p-3">
+                        <p className="text-sm font-semibold text-white">{rx.diagnosis}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {(rx.medications || []).map(m => m.name).filter(Boolean).join(', ') || 'Medication details'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="font-display font-bold text-white mb-3">Reports</h3>
+                {!reportsData?.reports?.length ? (
+                  <p className="text-slate-600 text-sm py-4">No reports uploaded</p>
+                ) : (
+                  <div className="space-y-2">
+                    {reportsData.reports.slice(0, 5).map((report, i) => (
+                      <a
+                        key={report._id ?? i}
+                        href={report.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-xl border border-surface-border bg-surface-muted p-3 hover:border-primary-500/40"
+                      >
+                        <p className="truncate text-sm font-semibold text-white">{report.originalName || report.filename}</p>
+                        <p className="mt-1 text-xs text-slate-500">{report.tag || report.category || 'Report'} · {formatDate(report.createdAt)}</p>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
+      </Modal>
+
+      <Modal open={actionModal === 'rx'} onClose={closeAction} title="Create prescription" size="lg">
+        <form onSubmit={handleRxSubmit} className="space-y-4">
+          <p className="text-sm text-slate-500">Patient: <strong className="text-white">{selected?.name}</strong></p>
+          <div>
+            <label className="label">Diagnosis *</label>
+            <input
+              value={rxForm.diagnosis}
+              onChange={(e) => setRxForm((f) => ({ ...f, diagnosis: e.target.value }))}
+              className="input"
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Instructions</label>
+            <textarea
+              value={rxForm.instructions}
+              onChange={(e) => setRxForm((f) => ({ ...f, instructions: e.target.value }))}
+              rows={2}
+              className="input resize-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="label">Medication *</label>
+            {rxForm.medications.map((m, idx) => (
+              <div key={idx} className="grid grid-cols-2 gap-2">
+                {['name', 'dosage', 'frequency', 'duration'].map(field => (
+                  <input
+                    key={field}
+                    placeholder={field[0].toUpperCase() + field.slice(1)}
+                    value={m[field]}
+                    onChange={(e) => {
+                      const next = [...rxForm.medications]
+                      next[idx] = { ...next[idx], [field]: e.target.value }
+                      setRxForm((f) => ({ ...f, medications: next }))
+                    }}
+                    className="input text-sm"
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={closeAction} className="btn-ghost flex-1 border border-surface-border">Cancel</button>
+            <button type="submit" disabled={rxMut.isPending} className="btn-primary flex-1">
+              {rxMut.isPending ? 'Saving...' : 'Save prescription'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={actionModal === 'report'} onClose={closeAction} title="Upload patient report" size="md">
+        <form onSubmit={handleReportSubmit} className="space-y-4">
+          <p className="text-sm text-slate-500">Patient: <strong className="text-white">{selected?.name}</strong></p>
+          <div>
+            <label className="label">Report file *</label>
+            <input
+              type="file"
+              accept=".pdf,image/jpeg,image/png,image/webp"
+              onChange={(e) => setReportForm((f) => ({ ...f, file: e.target.files?.[0] || null }))}
+              className="input file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Tag</label>
+            <input
+              value={reportForm.tag}
+              onChange={(e) => setReportForm((f) => ({ ...f, tag: e.target.value }))}
+              className="input"
+              placeholder="Lab report, X-Ray, discharge summary"
+            />
+          </div>
+          <div>
+            <label className="label">Category</label>
+            <select
+              value={reportForm.category}
+              onChange={(e) => setReportForm((f) => ({ ...f, category: e.target.value }))}
+              className="input"
+            >
+              <option value="lab">Lab</option>
+              <option value="imaging">Imaging</option>
+              <option value="prescription">Prescription</option>
+              <option value="insurance">Insurance</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <textarea
+              value={reportForm.description}
+              onChange={(e) => setReportForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+              className="input resize-none"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={closeAction} className="btn-ghost flex-1 border border-surface-border">Cancel</button>
+            <button type="submit" disabled={reportMut.isPending} className="btn-primary flex-1">
+              {reportMut.isPending ? 'Uploading...' : 'Upload report'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   )

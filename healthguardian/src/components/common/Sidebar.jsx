@@ -5,6 +5,7 @@ import {
   RiRobotLine, RiGroupLine, RiShieldUserLine,
   RiLogoutBoxRLine, RiSettings3Line,
   RiShieldCheckLine, RiIdCardLine, RiSendPlaneFill, RiInboxLine,
+  RiCalendarLine, RiHeartPulseLine,
 } from 'react-icons/ri'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials, getAvatarColor } from '../../utils/helpers'
@@ -16,6 +17,8 @@ const NAV = {
     { to: '/patient',             label: 'Dashboard',      icon: RiDashboardLine,   group: 'main' },
     { to: '/patient/records',     label: 'My Records',     icon: RiFileList3Line,   group: 'main' },
     { to: '/patient/upload',      label: 'Upload Report',  icon: RiUploadCloud2Line,group: 'main' },
+    { to: '/patient/appointments',label: 'Appointments',   icon: RiCalendarLine,    group: 'main' },
+    { to: '/patient/prescriptions', label: 'Prescriptions', icon: RiHeartPulseLine, group: 'main' },
     { to: '/patient/ai-chat',     label: 'AI Assistant',   icon: RiRobotLine,       group: 'main' },
     { to: '/patient/my-id',       label: 'My Patient ID',  icon: RiIdCardLine,      group: 'access' },
     { to: '/patient/access',      label: 'Doctor Access',  icon: RiShieldCheckLine, group: 'access' },
@@ -23,7 +26,7 @@ const NAV = {
   doctor: [
     { to: '/doctor',              label: 'Dashboard',      icon: RiDashboardLine,   group: 'main' },
     { to: '/doctor/patients',     label: 'My Patients',    icon: RiGroupLine,       group: 'main' },
-    { to: '/doctor/ai-chat',      label: 'AI Assistant',   icon: RiRobotLine,       group: 'main' },
+    { to: '/doctor/appointments', label: 'Appointments',   icon: RiCalendarLine,    group: 'main' },
     { to: '/doctor/request-access', label: 'Request Access', icon: RiSendPlaneFill, group: 'access' },
     { to: '/doctor/my-requests',  label: 'My Requests',    icon: RiInboxLine,       group: 'access' },
   ],

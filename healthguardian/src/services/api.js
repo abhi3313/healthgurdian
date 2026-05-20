@@ -33,6 +33,8 @@ api.interceptors.response.use(
     const status  = error.response?.status
     const message = error.response?.data?.message || error.message || 'Something went wrong'
 
+    const silent = error.config?.silent
+
     if (status === 401) {
       localStorage.removeItem('hg_token')
       localStorage.removeItem('hg_user')
@@ -41,7 +43,7 @@ api.interceptors.response.use(
         window.location.href = '/login'
         toast.error('Session expired. Please login again.')
       }
-    } else if (status !== 422 && status !== 409) {
+    } else if (!silent && status !== 422 && status !== 409) {
       toast.error(message)
     }
     return Promise.reject(error)
