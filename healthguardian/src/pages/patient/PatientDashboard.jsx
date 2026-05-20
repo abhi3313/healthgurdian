@@ -1,30 +1,31 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   RiHeartPulseLine, RiFileList3Line, RiCalendarLine,
   RiDropLine, RiThermometerLine, RiLungsLine,
+  RiAddLine,
 } from 'react-icons/ri'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, AreaChart, Area,
-} from 'recharts'
 import { patientService } from '../../services/patientService'
 import { unwrapData } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 import StatCard from '../../components/common/StatCard'
 import { FullPageLoader, SkeletonCard } from '../../components/common/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
 import { formatDate, timeAgo, statusColor } from '../../utils/helpers'
+import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
-const CustomTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-surface-card border border-surface-border rounded-xl px-3 py-2 text-xs shadow-card">
-      <p className="text-slate-400 mb-1">{label}</p>
-      {payload.map(p => (
-        <p key={p.name} style={{ color: p.color }} className="font-semibold">{p.name}: {p.value}</p>
-      ))}
-    </div>
-  )
+const EMPTY_VITAL_FORM = {
+  heartRate: '',
+  systolic: '',
+  diastolic: '',
+  temperature: '',
+  oxygen: '',
+  glucose: '',
+  weight: '',
+  height: '',
+  notes: '',
 }
 
 const patientDashboardQuery = {
@@ -35,17 +36,75 @@ const patientDashboardQuery = {
 }
 
 export default function PatientDashboard() {
+  const { user } = useAuth()
+  const qc = useQueryClient()
+  const [vitalsModal, setVitalsModal] = useState(false)
+  const [vitalForm, setVitalForm] = useState(EMPTY_VITAL_FORM)
+
   const { data: dash, isLoading, isError } = useQuery({
     queryKey: ['patient-dashboard'],
     queryFn: () => patientService.getDashboard().then(unwrapData),
     ...patientDashboardQuery,
   })
 
-  const { data: vitals } = useQuery({
-    queryKey: ['patient-vitals', '7d'],
-    queryFn: () => patientService.getVitals('7d').then(unwrapData),
-    ...patientDashboardQuery,
+  const addVitalMut = useMutation({
+    mutationFn: (payload) => patientService.addVital(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['patient-vitals'] })
+      toast.success('Vitals recorded')
+      setVitalsModal(false)
+      setVitalForm(EMPTY_VITAL_FORM)
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Could not save vitals')
+    },
   })
+
+  const setVitalField = (field, value) => {
+    setVitalForm((f) => ({ ...f, [field]: value }))
+  }
+
+  const numberOrUndefined = (value) => {
+    if (value === '' || value == null) return undefined
+    const n = Number(value)
+    return Number.isFinite(n) ? n : undefined
+  }
+
+  const handleVitalSubmit = (e) => {
+    e.preventDefault()
+    const heartRate = numberOrUndefined(vitalForm.heartRate)
+    const systolic = numberOrUndefined(vitalForm.systolic)
+    const diastolic = numberOrUndefined(vitalForm.diastolic)
+    const temperature = numberOrUndefined(vitalForm.temperature)
+    const oxygen = numberOrUndefined(vitalForm.oxygen)
+    const glucose = numberOrUndefined(vitalForm.glucose)
+    const weight = numberOrUndefined(vitalForm.weight)
+    const height = numberOrUndefined(vitalForm.height)
+
+    if (
+      heartRate == null && systolic == null && diastolic == null &&
+      temperature == null && oxygen == null && glucose == null &&
+      weight == null && height == null && !vitalForm.notes.trim()
+    ) {
+      toast.error('Enter at least one vital value')
+      return
+    }
+
+    const payload = {
+      notes: vitalForm.notes.trim(),
+      recordedAt: new Date().toISOString(),
+    }
+    if (heartRate != null) payload.heartRate = { value: heartRate }
+    if (systolic != null || diastolic != null) payload.bloodPressure = { systolic, diastolic }
+    if (temperature != null) payload.temperature = { value: temperature }
+    if (oxygen != null) payload.oxygenSaturation = { value: oxygen }
+    if (glucose != null) payload.glucose = { value: glucose, type: 'random' }
+    if (weight != null) payload.weight = { value: weight }
+    if (height != null) payload.height = { value: height }
+
+    addVitalMut.mutate(payload)
+  }
 
   if (isLoading) return <FullPageLoader message="Loading your health dashboard…" />
   if (isError)   return (
@@ -57,8 +116,38 @@ export default function PatientDashboard() {
   const stats = dash?.stats ?? {}
   const appointments = dash?.upcomingAppointments ?? []
   const recentRecords = dash?.recentRecords ?? []
-  const vitalsData = vitals?.chart ?? []
   const currentVitals = dash?.currentVitals ?? {}
+  const profile = user ?? {}
+
+  const formatList = (value) => {
+    if (!Array.isArray(value) || value.length === 0) return 'Not provided'
+    const cleaned = value.map(v => String(v).trim()).filter(Boolean)
+    return cleaned.length ? cleaned.join(', ') : 'Not provided'
+  }
+
+  const formatValue = (value) => {
+    const cleaned = String(value ?? '').trim()
+    return cleaned || 'Not provided'
+  }
+
+  const emergencyContactName = formatValue(profile?.emergencyContact?.name)
+  const emergencyContactPhone = formatValue(profile?.emergencyContact?.phone)
+  const emergencyContact = (emergencyContactName === 'Not provided' && emergencyContactPhone === 'Not provided')
+    ? 'Not provided'
+    : `${emergencyContactName} (${emergencyContactPhone})`
+  const chronicConditionsText = formatList(profile?.chronicConditions)
+  const hasDiabetes = Array.isArray(profile?.chronicConditions)
+    && profile.chronicConditions.some(item => String(item).toLowerCase().includes('diabet'))
+
+  const emergencyDetails = [
+    { label: 'Blood Group', value: formatValue(profile?.bloodGroup) },
+    { label: 'Allergies', value: formatList(profile?.allergies) },
+    { label: 'Chronic Conditions', value: chronicConditionsText },
+    { label: 'Diabetes', value: hasDiabetes ? 'Yes' : (chronicConditionsText === 'Not provided' ? 'Not provided' : 'No') },
+    { label: 'Emergency Contact', value: emergencyContact },
+    { label: 'Gender', value: formatValue(profile?.gender) },
+    { label: 'Date of Birth', value: profile?.dateOfBirth ? formatDate(profile.dateOfBirth) : 'Not provided' },
+  ]
 
   return (
     <div className="space-y-6">
@@ -78,7 +167,16 @@ export default function PatientDashboard() {
 
       {/* Current Vitals */}
       <div>
-        <h2 className="font-display font-bold text-white mb-3">Current Vitals</h2>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="font-display font-bold text-white">Current Vitals</h2>
+          <button
+            type="button"
+            onClick={() => setVitalsModal(true)}
+            className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-sm"
+          >
+            <RiAddLine className="text-lg" /> Record vitals
+          </button>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
             { label: 'Heart Rate',   value: currentVitals.heartRate,    unit: 'bpm',  icon: RiHeartPulseLine,  color: 'text-danger' },
@@ -106,31 +204,20 @@ export default function PatientDashboard() {
 
       {/* Charts + Appointments */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Vitals Chart */}
+        {/* Emergency Details */}
         <div className="xl:col-span-2 card">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-display font-bold text-white">Heart Rate – Last 7 Days</h2>
-            <span className="badge badge-info">Live</span>
+            <h2 className="font-display font-bold text-white">Emergency Details</h2>
+            <span className="badge badge-info">Critical</span>
           </div>
-          {vitalsData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={vitalsData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="hrGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#3897f0" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3897f0" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="#1e2d42" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="heartRate" name="Heart Rate" stroke="#3897f0" strokeWidth={2} fill="url(#hrGrad)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-52 flex items-center justify-center text-slate-600 text-sm">No vitals data yet</div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {emergencyDetails.map((item) => (
+              <div key={item.label} className="rounded-xl border border-surface-border bg-surface-muted px-4 py-3">
+                <p className="text-xs uppercase tracking-wider text-slate-500">{item.label}</p>
+                <p className="mt-1 text-sm font-semibold text-white break-words">{item.value}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Upcoming Appointments */}
@@ -207,6 +294,62 @@ export default function PatientDashboard() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={vitalsModal}
+        onClose={() => {
+          if (!addVitalMut.isPending) setVitalsModal(false)
+        }}
+        title="Record Vitals"
+        size="lg"
+      >
+        <form onSubmit={handleVitalSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Heart rate (bpm)</label>
+              <input type="number" min="20" max="250" value={vitalForm.heartRate} onChange={e => setVitalField('heartRate', e.target.value)} className="input" placeholder="72" />
+            </div>
+            <div>
+              <label className="label">Oxygen saturation (%)</label>
+              <input type="number" min="50" max="100" value={vitalForm.oxygen} onChange={e => setVitalField('oxygen', e.target.value)} className="input" placeholder="98" />
+            </div>
+            <div>
+              <label className="label">Systolic BP</label>
+              <input type="number" min="50" max="260" value={vitalForm.systolic} onChange={e => setVitalField('systolic', e.target.value)} className="input" placeholder="120" />
+            </div>
+            <div>
+              <label className="label">Diastolic BP</label>
+              <input type="number" min="30" max="180" value={vitalForm.diastolic} onChange={e => setVitalField('diastolic', e.target.value)} className="input" placeholder="80" />
+            </div>
+            <div>
+              <label className="label">Temperature (F)</label>
+              <input type="number" step="0.1" min="90" max="110" value={vitalForm.temperature} onChange={e => setVitalField('temperature', e.target.value)} className="input" placeholder="98.6" />
+            </div>
+            <div>
+              <label className="label">Glucose (mg/dL)</label>
+              <input type="number" min="30" max="600" value={vitalForm.glucose} onChange={e => setVitalField('glucose', e.target.value)} className="input" placeholder="100" />
+            </div>
+            <div>
+              <label className="label">Weight (kg)</label>
+              <input type="number" step="0.1" min="1" max="400" value={vitalForm.weight} onChange={e => setVitalField('weight', e.target.value)} className="input" placeholder="70" />
+            </div>
+            <div>
+              <label className="label">Height (cm)</label>
+              <input type="number" step="0.1" min="30" max="260" value={vitalForm.height} onChange={e => setVitalField('height', e.target.value)} className="input" placeholder="170" />
+            </div>
+          </div>
+          <div>
+            <label className="label">Notes</label>
+            <textarea value={vitalForm.notes} onChange={e => setVitalField('notes', e.target.value)} rows={3} className="input resize-none" placeholder="Optional notes" />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => setVitalsModal(false)} disabled={addVitalMut.isPending} className="btn-ghost flex-1 border border-surface-border">Cancel</button>
+            <button type="submit" disabled={addVitalMut.isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
+              {addVitalMut.isPending ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Save vitals'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

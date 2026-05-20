@@ -3,12 +3,14 @@ import Sidebar from './Sidebar'
 import TopBar  from './TopBar'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTheme } from '../../context/ThemeContext'
 
 export default function DashboardLayout({ role }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const { isDark } = useTheme()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface">
+    <div className={`flex h-screen overflow-hidden bg-surface ${isDark ? 'theme-dark' : 'theme-light light-dashboard'}`}>
       {/* Sidebar */}
       <AnimatePresence mode="wait">
         {sidebarOpen && (

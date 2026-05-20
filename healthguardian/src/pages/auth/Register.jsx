@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { GoogleLogin } from '@react-oauth/google'
 import {
-  RiHeartPulseFill, RiUserLine, RiMailLine,
+  RiUserLine, RiMailLine,
   RiLockPasswordLine, RiEyeLine, RiEyeOffLine, RiPhoneLine,
 } from 'react-icons/ri'
 import { useAuth } from '../../context/AuthContext'
+import Logo from '../../components/common/Logo'
+import { useTheme } from '../../context/ThemeContext'
 import { sendOtp } from '../../services/authService'
 import { ROLES, BLOOD_GROUPS } from '../../utils/constants'
 import toast from 'react-hot-toast'
@@ -14,9 +17,11 @@ const ROLE_OPTIONS = [
   { value: 'patient', label: '🧑‍⚕️ Patient',     desc: 'Manage my health records' },
   { value: 'doctor',  label: '👨‍⚕️ Doctor',     desc: 'Manage patients & records' },
 ]
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 export default function Register() {
-  const { register, loading } = useAuth()
+  const { register, loginWithGoogle, loading } = useAuth()
+  const { isDark, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [step, setStep]       = useState(1)
   const [showPass, setShowPass] = useState(false)
@@ -68,8 +73,25 @@ export default function Register() {
     }
   }
 
+  const goHome = (user) => {
+    const routes = { patient: '/patient', doctor: '/doctor', admin: '/admin' }
+    navigate(routes[user.role] ?? '/login')
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden ${isDark ? 'theme-dark' : 'theme-light light-auth'}`}>
+      <button
+        aria-label="Toggle theme"
+        className={`absolute right-4 top-4 z-20 rounded-full p-2.5 transition-colors ${
+          isDark
+            ? 'border border-surface-border bg-surface-card/80 text-slate-300 hover:bg-surface-muted'
+            : 'border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-100'
+        }`}
+        onClick={toggleTheme}
+        type="button"
+      >
+        <span className="text-base">{isDark ? '☀' : '☾'}</span>
+      </button>
       <div className="absolute top-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl -translate-x-1/2 translate-y-1/2" />
 
@@ -81,7 +103,7 @@ export default function Register() {
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-accent shadow-glow mb-4">
-            <RiHeartPulseFill className="text-white text-2xl" />
+            <Logo className="w-9 h-9" />
           </div>
           <h1 className="font-display text-2xl font-bold text-white">Create Account</h1>
           <p className="text-slate-400 mt-1 text-sm">Join HealthGuardian today</p>
@@ -161,7 +183,7 @@ export default function Register() {
                     </div>
                     <div>
                       <label className="label">Date of Birth</label>
-                      <input type="date" value={form.dateOfBirth} onChange={e => set('dateOfBirth', e.target.value)} className="input" />
+                      <input type="date" value={form.dateOfBirth} onChange={e => set('dateOfBirth', e.target.value)} className="input" max={new Date().toISOString().split('T')[0]} />
                     </div>
                   </div>
                 )}
@@ -280,6 +302,40 @@ export default function Register() {
             Already have an account?{' '}
             <Link to="/login" className="text-primary-400 hover:text-primary-300 font-semibold">Sign in</Link>
           </p>
+
+          <div className="mt-5 border-t border-surface-border pt-5">
+            <p className="mb-3 text-center text-xs text-slate-500">Or continue with</p>
+            {googleClientId ? (
+              <div className="flex justify-center [&>div]:w-full">
+                <GoogleLogin
+                  onSuccess={async (cred) => {
+                    if (!cred?.credential) {
+                      toast.error('Google did not return a valid credential.')
+                      return
+                    }
+                    try {
+                      const user = await loginWithGoogle(cred.credential)
+                      goHome(user)
+                    } catch (err) {
+                      toast.error(err.response?.data?.message || 'Google sign-in failed')
+                    }
+                  }}
+                  onError={() => toast.error('Google sign-in was cancelled or failed.')}
+                  theme="filled_black"
+                  size="large"
+                  text="continue_with"
+                />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-surface-border bg-surface-muted/60 px-4 py-3 text-center text-xs text-slate-400">
+                Google Sign-In is not configured yet. Add <code className="text-primary-400">VITE_GOOGLE_CLIENT_ID</code> in frontend
+                <code className="ml-1 text-primary-400">.env</code> and restart the dev server.
+              </div>
+            )}
+            <p className="mt-2 text-center text-[11px] text-slate-500">
+              Google sign-in creates or opens a patient account. Use standard registration for doctor onboarding.
+            </p>
+          </div>
         </div>
       </motion.div>
     </div>

@@ -5,7 +5,7 @@ import {
   RiGroupLine, RiShieldUserLine, RiUserAddLine,
   RiSearchLine, RiDeleteBinLine, RiToggleLine,
   RiHeartPulseLine, RiServerLine, RiFilterLine,
-  RiTimeLine, RiCheckLine, RiCloseLine,
+  RiTimeLine, RiCheckLine, RiCloseLine, RiRefreshLine,
 } from 'react-icons/ri'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
@@ -41,7 +41,7 @@ export default function AdminPanel() {
     queryFn: () => adminService.getUsers({ role: roleFilter !== 'all' ? roleFilter : undefined }).then(unwrapData),
   })
 
-  const { data: sysData } = useQuery({
+  const { data: sysData, refetch: refetchSystemHealth, isFetching: systemHealthFetching } = useQuery({
     queryKey: ['admin-system'],
     queryFn: () => adminService.getSystemHealth().then(unwrapData),
     refetchInterval: 30000,
@@ -217,7 +217,23 @@ export default function AdminPanel() {
 
         {/* System Health */}
         <div className="xl:col-span-2 card">
-          <h2 className="font-display font-bold text-white mb-4">System Health</h2>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="font-display font-bold text-white">System Health</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Last checked {sysData?.checkedAt ? timeAgo(sysData.checkedAt) : 'soon'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => refetchSystemHealth()}
+              disabled={systemHealthFetching}
+              className="btn-ghost border border-surface-border inline-flex items-center gap-2 px-3 py-2 text-sm"
+            >
+              <RiRefreshLine className={clsx('text-lg', systemHealthFetching && 'animate-spin')} />
+              Refresh
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'API Status',    value: sysData?.apiStatus    ?? 'Checking…', ok: sysData?.apiStatus    === 'online' },

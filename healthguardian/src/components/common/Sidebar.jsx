@@ -1,7 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  RiHeartPulseFill,
   RiDashboardLine, RiFileList3Line, RiUploadCloud2Line,
   RiRobotLine, RiGroupLine, RiShieldUserLine,
   RiLogoutBoxRLine, RiSettings3Line,
@@ -10,6 +9,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { getInitials, getAvatarColor } from '../../utils/helpers'
 import clsx from 'clsx'
+import Logo from './Logo'
 
 const NAV = {
   patient: [
@@ -51,13 +51,16 @@ export default function Sidebar({ role }) {
   const mainLinks        = allLinks.filter(l => l.group === 'main')
   const accessLinks      = allLinks.filter(l => l.group === 'access')
 
-  const handleLogout = () => { logout(); navigate('/login') }
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
 
   return (
     <aside className="w-64 h-full flex flex-col bg-surface-card border-r border-surface-border">
       <div className="flex items-center gap-3 px-5 py-5 border-b border-surface-border">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-accent flex items-center justify-center shadow-glow">
-          <RiHeartPulseFill className="text-white text-xl" />
+        <div className="w-10 h-10 rounded-2xl bg-slate-900/10 flex items-center justify-center shadow-glow">
+          <Logo className="w-7 h-7" />
         </div>
         <div>
           <p className="font-display font-bold text-white text-base leading-none">HealthGuardian</p>

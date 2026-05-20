@@ -20,9 +20,11 @@ import AIChat            from './pages/ai/AIChat'
 import Settings          from './pages/settings/Settings'
 import DashboardLayout   from './components/common/DashboardLayout'
 import DoctorLayoutGate  from './components/common/DoctorLayoutGate'
+import LandingPage       from './pages/LandingPage'
 
 function PrivateRoute({ children, roles }) {
-  const { user, token } = useAuth()
+  const { user, token, authReady } = useAuth()
+  if (!authReady) return <div className="min-h-screen bg-surface" />
   if (!token) return <Navigate to="/login" replace />
   if (roles && !roles.includes(user?.role)) return <Navigate to="/login" replace />
   return children
@@ -32,6 +34,7 @@ export default function App() {
   return (
     <Routes>
       {/* ── Public ──────────────────────────────────── */}
+      <Route path="/"         element={<LandingPage />} />
       <Route path="/login"    element={<Login />} />
       <Route path="/register" element={<Register />} />
 
@@ -79,7 +82,7 @@ export default function App() {
       </Route>
 
       {/* ── Fallback ────────────────────────────────── */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

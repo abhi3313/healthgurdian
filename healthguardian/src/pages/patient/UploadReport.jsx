@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   RiUploadCloud2Line, RiFileLine, RiDeleteBinLine,
-  RiCheckLine, RiImageLine, RiFileTextLine,
+  RiCheckLine, RiImageLine, RiFileTextLine, RiSearchLine,
 } from 'react-icons/ri'
 import { patientService } from '../../services/patientService'
 import { unwrapData } from '../../services/api'
@@ -15,12 +16,15 @@ const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp
 const MAX_SIZE = 10 * 1024 * 1024 // 10MB
 
 export default function UploadReport() {
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const inputRef = useRef(null)
   const [files, setFiles]         = useState([])
   const [dragging, setDragging]   = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadedList, setUploadedList] = useState([])
   const [tag, setTag]             = useState('')
+  const [search, setSearch]       = useState(initialQuery)
 
   const { data: reports, refetch } = useQuery({
     queryKey: ['patient-reports'],
@@ -81,6 +85,16 @@ export default function UploadReport() {
   }
 
   const fileIcon = (type) => type.startsWith('image') ? RiImageLine : RiFileTextLine
+  const filteredReports = (reports?.reports ?? []).filter((r) => {
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    const hay = [r.filename, r.name, r.tag].join(' ').toLowerCase()
+    return hay.includes(q)
+  })
+
+  useEffect(() => {
+    setSearch(searchParams.get('q') || '')
+  }, [searchParams])
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -173,11 +187,20 @@ export default function UploadReport() {
       {/* Uploaded reports */}
       <div>
         <h2 className="font-display font-bold text-white mb-3">Previously Uploaded Reports</h2>
-        {!reports?.reports?.length ? (
+        <div className="relative mb-3">
+          <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search uploaded reports..."
+            className="input pl-10"
+          />
+        </div>
+        {!filteredReports.length ? (
           <div className="card text-center py-12 text-slate-600 text-sm">No reports uploaded yet</div>
         ) : (
           <div className="space-y-3">
-            {reports.reports.map((r, i) => (
+            {filteredReports.map((r, i) => (
               <motion.div
                 key={r._id}
                 initial={{ opacity: 0 }}

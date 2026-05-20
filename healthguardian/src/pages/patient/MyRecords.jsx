@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -18,8 +19,14 @@ import clsx from 'clsx'
 const EMPTY_FORM = { type: '', description: '', notes: '', date: '' }
 
 export default function MyRecords() {
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const qc = useQueryClient()
-  const [search, setSearch]     = useState('')
+  const [search, setSearch]     = useState(initialQuery)
+  useEffect(() => {
+    setSearch(searchParams.get('q') || '')
+  }, [searchParams])
+
   const [filter, setFilter]     = useState('all')
   const [modal, setModal]       = useState(false)
   const [editRecord, setEdit]   = useState(null)
@@ -198,7 +205,7 @@ export default function MyRecords() {
           </div>
           <div>
             <label className="label">Date</label>
-            <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="input" />
+            <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="input" max={new Date().toISOString().split('T')[0]} />
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={closeModal} className="btn-ghost flex-1 border border-surface-border">Cancel</button>

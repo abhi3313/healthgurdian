@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { RiCalendarLine, RiUserLine, RiAddLine, RiCloseLine } from 'react-icons/ri'
+import { RiCalendarLine, RiUserLine, RiAddLine, RiCloseLine, RiSearchLine } from 'react-icons/ri'
+import { useSearchParams } from 'react-router-dom'
 import { patientService } from '../../services/patientService'
 import { unwrapData } from '../../services/api'
 import { FullPageLoader } from '../../components/common/LoadingSpinner'
@@ -17,7 +18,10 @@ const APT_TYPES = [
 ]
 
 export default function MyAppointments() {
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const qc = useQueryClient()
+  const [search, setSearch] = useState(initialQuery)
   const [bookOpen, setBookOpen] = useState(false)
   const [docSearch, setDocSearch] = useState('')
   const [selectedDoctor, setSelectedDoctor] = useState(null)
@@ -71,7 +75,24 @@ export default function MyAppointments() {
   })
 
   const appointments = data?.appointments ?? []
+  const filteredAppointments = appointments.filter((apt) => {
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    const hay = [
+      apt.reason,
+      apt.status,
+      apt.time,
+      apt.doctor?.name,
+      apt.doctor?.specialization,
+      apt.doctor?.hospital,
+    ].join(' ').toLowerCase()
+    return hay.includes(q)
+  })
   const doctors = doctorsData?.doctors ?? []
+
+  useEffect(() => {
+    setSearch(searchParams.get('q') || '')
+  }, [searchParams])
 
   const handleBook = (e) => {
     e.preventDefault()
@@ -115,15 +136,27 @@ export default function MyAppointments() {
         </button>
       </div>
 
-      {appointments.length === 0 ? (
+      <div className="relative">
+        <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search appointments..."
+          className="input pl-10"
+        />
+      </div>
+
+      {filteredAppointments.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-20 text-center">
           <RiCalendarLine className="text-5xl text-slate-700 mb-4" />
-          <p className="text-slate-400 font-semibold">No appointments yet</p>
-          <p className="text-slate-600 text-sm mt-1">Book your first visit with an approved doctor.</p>
+          <p className="text-slate-400 font-semibold">No appointments found</p>
+          <p className="text-slate-600 text-sm mt-1">
+            {search.trim() ? 'Try a different keyword.' : 'Book your first visit with an approved doctor.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {appointments.map((apt, i) => (
+          {filteredAppointments.map((apt, i) => (
             <motion.div
               key={apt._id ?? i}
               initial={{ opacity: 0, y: 8 }}

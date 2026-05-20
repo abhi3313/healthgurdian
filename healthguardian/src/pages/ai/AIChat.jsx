@@ -5,6 +5,7 @@ import {
   RiDeleteBinLine, RiSparklingLine, RiRefreshLine,
 } from 'react-icons/ri'
 import { aiService } from '../../services/aiService'
+import { unwrapData } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateTime } from '../../utils/helpers'
 import toast from 'react-hot-toast'
@@ -106,10 +107,14 @@ export default function AIChat() {
 
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }))
-      const { data } = await aiService.query(content, history)
+      const res = await aiService.query(content, history)
+      const payload = unwrapData(res) ?? {}
+      const replyText = payload.reply ?? res.data?.data?.reply
       const aiMsg = {
         role: 'assistant',
-        content: data?.reply ?? data?.message ?? 'I apologize, I could not generate a response. Please try again.',
+        content: replyText && String(replyText).trim()
+          ? replyText
+          : 'I apologize, I could not generate a response. Please try again.',
         timestamp: new Date().toISOString(),
       }
       setMessages(prev => [...prev, aiMsg])

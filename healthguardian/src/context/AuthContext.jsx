@@ -13,10 +13,16 @@ const getStoredUser = () => {
   }
 }
 
+const clearStoredSession = () => {
+  localStorage.removeItem('hg_token')
+  localStorage.removeItem('hg_user')
+}
+
 export function AuthProvider({ children }) {
   const [token,   setToken]   = useState(() => localStorage.getItem('hg_token') || null)
   const [user,    setUser]    = useState(() => getStoredUser())
   const [loading, setLoading] = useState(false)
+  const [authReady, setAuthReady] = useState(() => !localStorage.getItem('hg_token'))
 
   useEffect(() => {
     if (token) {
@@ -26,67 +32,89 @@ export function AuthProvider({ children }) {
     }
   }, [token])
 
+  useEffect(() => {
+    let active = true
+    const bootstrapSession = async () => {
+      if (!token) {
+        if (active) setAuthReady(true)
+        return
+      }
+      try {
+        const res = await api.get('/auth/me')
+        const u = unwrapData(res)?.user
+        if (u && active) {
+          localStorage.setItem('hg_user', JSON.stringify(u))
+          setUser(u)
+        }
+      } catch {
+        if (active) {
+          clearStoredSession()
+          delete api.defaults.headers.common['Authorization']
+          setToken(null)
+          setUser(null)
+        }
+      } finally {
+        if (active) setAuthReady(true)
+      }
+    }
+
+    bootstrapSession()
+    return () => { active = false }
+  }, [token])
+
+  const applySession = useCallback((tk, u) => {
+    localStorage.setItem('hg_token', tk)
+    localStorage.setItem('hg_user', JSON.stringify(u))
+    api.defaults.headers.common['Authorization'] = `Bearer ${tk}`
+    setToken(tk)
+    setUser(u)
+  }, [])
+
   const login = useCallback(async (email, password) => {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/login', { email, password })
       const { token: tk, user: u } = data.data
-      localStorage.setItem('hg_token', tk)
-      localStorage.setItem('hg_user',  JSON.stringify(u))
-      api.defaults.headers.common['Authorization'] = `Bearer ${tk}`
-      setToken(tk)
-      setUser(u)
+      applySession(tk, u)
       toast.success(`Welcome back, ${u.name}!`)
       return u
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [applySession])
 
   const loginWithOtp = useCallback(async (email, code) => {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/otp/login', { email, code })
       const { token: tk, user: u } = data.data
-      localStorage.setItem('hg_token', tk)
-      localStorage.setItem('hg_user',  JSON.stringify(u))
-      api.defaults.headers.common['Authorization'] = `Bearer ${tk}`
-      setToken(tk)
-      setUser(u)
+      applySession(tk, u)
       toast.success(`Welcome back, ${u.name}!`)
       return u
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [applySession])
 
   const loginWithGoogle = useCallback(async (idToken) => {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/google', { idToken })
       const { token: tk, user: u } = data.data
-      localStorage.setItem('hg_token', tk)
-      localStorage.setItem('hg_user',  JSON.stringify(u))
-      api.defaults.headers.common['Authorization'] = `Bearer ${tk}`
-      setToken(tk)
-      setUser(u)
+      applySession(tk, u)
       toast.success(`Welcome back, ${u.name}!`)
       return u
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [applySession])
 
   const register = useCallback(async (payload) => {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/register', payload)
       const { token: tk, user: u } = data.data
-      localStorage.setItem('hg_token', tk)
-      localStorage.setItem('hg_user',  JSON.stringify(u))
-      api.defaults.headers.common['Authorization'] = `Bearer ${tk}`
-      setToken(tk)
-      setUser(u)
+      applySession(tk, u)
       toast.success(
         payload.role === 'doctor' && !u.isApproved
           ? 'Account created. Awaiting admin approval before you can use the doctor dashboard.'
@@ -96,11 +124,15 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [applySession])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('hg_token')
-    localStorage.removeItem('hg_user')
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Best-effort server logout (audit). Local session is always cleared.
+    }
+    clearStoredSession()
     delete api.defaults.headers.common['Authorization']
     setToken(null)
     setUser(null)
@@ -136,7 +168,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, loginWithOtp, loginWithGoogle, register, logout, setSessionUser, setSessionFromAuth, refreshUser }}>
+    <AuthContext.Provider value={{ token, user, loading, authReady, login, loginWithOtp, loginWithGoogle, register, logout, setSessionUser, setSessionFromAuth, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

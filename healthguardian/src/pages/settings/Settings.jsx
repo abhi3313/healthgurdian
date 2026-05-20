@@ -21,6 +21,10 @@ export default function Settings() {
     gender: '',
     dateOfBirth: '',
     address: '',
+    allergies: '',
+    chronicConditions: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
     specialization: '',
     hospital: '',
     licenseNumber: '',
@@ -41,6 +45,10 @@ export default function Settings() {
       gender: user.gender ?? '',
       dateOfBirth: user.dateOfBirth ? String(user.dateOfBirth).slice(0, 10) : '',
       address: user.address ?? '',
+      allergies: Array.isArray(user.allergies) ? user.allergies.join(', ') : '',
+      chronicConditions: Array.isArray(user.chronicConditions) ? user.chronicConditions.join(', ') : '',
+      emergencyContactName: user.emergencyContact?.name ?? '',
+      emergencyContactPhone: user.emergencyContact?.phone ?? '',
       specialization: user.specialization ?? '',
       hospital: user.hospital ?? '',
       licenseNumber: user.licenseNumber ?? '',
@@ -48,6 +56,10 @@ export default function Settings() {
   }, [user])
 
   const set = (k, v) => setProfile(prev => ({ ...prev, [k]: v }))
+  const parseCsvList = (value) => String(value || '')
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean)
 
   const handleSaveProfile = async (e) => {
     e.preventDefault()
@@ -63,6 +75,12 @@ export default function Settings() {
         payload.gender = profile.gender || ''
         if (profile.dateOfBirth) payload.dateOfBirth = profile.dateOfBirth
         payload.address = profile.address ?? ''
+        payload.allergies = parseCsvList(profile.allergies)
+        payload.chronicConditions = parseCsvList(profile.chronicConditions)
+        payload.emergencyContact = {
+          name: (profile.emergencyContactName || '').trim(),
+          phone: (profile.emergencyContactPhone || '').trim(),
+        }
       }
       if (role === 'doctor') {
         payload.specialization = profile.specialization ?? ''
@@ -185,6 +203,7 @@ export default function Settings() {
                 className="input"
                 value={profile.dateOfBirth}
                 onChange={e => set('dateOfBirth', e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
               />
             </div>
             <div>
@@ -194,6 +213,50 @@ export default function Settings() {
                 value={profile.address}
                 onChange={e => set('address', e.target.value)}
               />
+            </div>
+            <div className="pt-1">
+              <h3 className="text-sm font-semibold text-white">Emergency details</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                This information is shown in your dashboard emergency section.
+              </p>
+            </div>
+            <div>
+              <label className="label">Allergies (comma separated)</label>
+              <input
+                className="input"
+                value={profile.allergies}
+                onChange={e => set('allergies', e.target.value)}
+                placeholder="Peanuts, Penicillin, Dust"
+              />
+            </div>
+            <div>
+              <label className="label">Chronic conditions (comma separated)</label>
+              <input
+                className="input"
+                value={profile.chronicConditions}
+                onChange={e => set('chronicConditions', e.target.value)}
+                placeholder="Diabetes Type 2, Hypertension"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Emergency contact name</label>
+                <input
+                  className="input"
+                  value={profile.emergencyContactName}
+                  onChange={e => set('emergencyContactName', e.target.value)}
+                  placeholder="Contact person name"
+                />
+              </div>
+              <div>
+                <label className="label">Emergency contact phone</label>
+                <input
+                  className="input"
+                  value={profile.emergencyContactPhone}
+                  onChange={e => set('emergencyContactPhone', e.target.value)}
+                  placeholder="+91xxxxxxxxxx"
+                />
+              </div>
             </div>
           </>
         )}

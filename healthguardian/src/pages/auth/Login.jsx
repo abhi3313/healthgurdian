@@ -3,15 +3,18 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { GoogleLogin } from '@react-oauth/google'
 import clsx from 'clsx'
-import { RiHeartPulseFill, RiMailLine, RiLockPasswordLine, RiEyeLine, RiEyeOffLine, RiShieldKeyholeLine } from 'react-icons/ri'
+import { RiMailLine, RiLockPasswordLine, RiEyeLine, RiEyeOffLine, RiShieldKeyholeLine } from 'react-icons/ri'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 import { sendOtp } from '../../services/authService'
 import toast from 'react-hot-toast'
+import Logo from '../../components/common/Logo'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 export default function Login() {
   const { login, loginWithOtp, loginWithGoogle, loading } = useAuth()
+  const { isDark, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [mode, setMode]         = useState('password')
   const [form, setForm]         = useState({ email: '', password: '' })
@@ -80,7 +83,19 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div className={`min-h-screen flex items-center justify-center p-4 relative overflow-hidden ${isDark ? 'theme-dark' : 'theme-light light-auth'}`}>
+      <button
+        aria-label="Toggle theme"
+        className={`absolute right-4 top-4 z-20 rounded-full p-2.5 transition-colors ${
+          isDark
+            ? 'border border-surface-border bg-surface-card/80 text-slate-300 hover:bg-surface-muted'
+            : 'border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-100'
+        }`}
+        onClick={toggleTheme}
+        type="button"
+      >
+        <span className="text-base">{isDark ? '☀' : '☾'}</span>
+      </button>
       <div className="absolute top-0 left-0 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
 
@@ -96,7 +111,7 @@ export default function Login() {
             transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-accent shadow-glow mb-4"
           >
-            <RiHeartPulseFill className="text-white text-3xl" />
+            <Logo className="w-10 h-10" />
           </motion.div>
           <h1 className="font-display text-3xl font-bold text-white">HealthGuardian</h1>
           <p className="text-slate-400 mt-1 text-sm">Personal Health Management System</p>
@@ -232,12 +247,16 @@ export default function Login() {
             </form>
           )}
 
-          {googleClientId && (
-            <div className="mt-6 pt-6 border-t border-surface-border">
-              <p className="text-center text-xs text-slate-500 mb-3">Or continue with</p>
+          <div className="mt-6 border-t border-surface-border pt-6">
+            <p className="mb-3 text-center text-xs text-slate-500">Or continue with</p>
+            {googleClientId ? (
               <div className="flex justify-center [&>div]:w-full">
                 <GoogleLogin
                   onSuccess={async (cred) => {
+                    if (!cred?.credential) {
+                      toast.error('Google did not return a valid credential.')
+                      return
+                    }
                     try {
                       const user = await loginWithGoogle(cred.credential)
                       goHome(user)
@@ -252,11 +271,16 @@ export default function Login() {
                   text="continue_with"
                 />
               </div>
-              <p className="text-[11px] text-slate-500 text-center mt-2">
-                Google creates or opens a patient account. Doctors should register with email and password.
-              </p>
-            </div>
-          )}
+            ) : (
+              <div className="rounded-xl border border-surface-border bg-surface-muted/60 px-4 py-3 text-center text-xs text-slate-400">
+                Google Sign-In is not configured yet. Add <code className="text-primary-400">VITE_GOOGLE_CLIENT_ID</code> in frontend
+                <code className="ml-1 text-primary-400">.env</code> and restart the dev server.
+              </div>
+            )}
+            <p className="mt-2 text-center text-[11px] text-slate-500">
+              Google creates or opens a patient account. Doctors should register with email and password.
+            </p>
+          </div>
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Don&apos;t have an account?{' '}
@@ -266,28 +290,6 @@ export default function Login() {
           </p>
         </div>
 
-        {mode === 'password' && (
-          <div className="mt-4 card p-4">
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-widest mb-3">Demo Credentials</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { role: 'Patient', email: 'patient@demo.com', pass: 'demo123' },
-                { role: 'Doctor',  email: 'doctor@demo.com',  pass: 'demo123' },
-                { role: 'Admin',   email: 'admin@demo.com',   pass: 'demo123' },
-              ].map(d => (
-                <button
-                  key={d.role}
-                  type="button"
-                  onClick={() => setForm({ email: d.email, password: d.pass })}
-                  className="text-center p-2 rounded-lg bg-surface-muted border border-surface-border hover:border-primary-600/50 transition-all group"
-                >
-                  <p className="text-xs font-bold text-primary-400 group-hover:text-primary-300">{d.role}</p>
-                  <p className="text-[10px] text-slate-600 mt-0.5 truncate">{d.email}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </motion.div>
     </div>
   )

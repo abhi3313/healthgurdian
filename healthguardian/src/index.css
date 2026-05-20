@@ -79,3 +79,65 @@
   .no-scrollbar     { -ms-overflow-style: none; scrollbar-width: none; }
   .glass            { background: rgba(21,30,46,0.6); backdrop-filter: blur(12px); border: 1px solid rgba(30,45,66,0.8); }
 }
+
+/* ── Light Theme Overrides ──────────────────────────────── */
+html.light body {
+  background: #f3f7ff;
+  color: #0f172a;
+}
+
+html.light .bg-surface { background-color: #f3f7ff !important; }
+html.light .bg-surface-card { background-color: #ffffff !important; }
+html.light .bg-surface-muted { background-color: #eef3fb !important; }
+html.light .border-surface-border { border-color: #d9e4f3 !important; }
+
+html.light .card {
+  background: #ffffff;
+  border-color: #d9e4f3;
+  box-shadow: 0 10px 24px rgba(25, 52, 92, 0.08);
+}
+
+html.light .input {
+  background: #f8fbff;
+  border-color: #d9e4f3;
+  color: #0f172a;
+}
+
+html.light .label { color: #64748b; }
+html.light .nav-link { color: #475569; }
+html.light .nav-link:hover { color: #0f172a; background: #e8effa; }
+html.light .nav-link.active { color: #1d4ed8; background: #e8f0ff; border-color: #bfdbfe; }
+
+html.light .light-auth .text-white,
+html.light .light-dashboard .text-white { color: #0f172a !important; }
+html.light .light-auth .text-slate-100,
+html.light .light-dashboard .text-slate-100 { color: #0f172a !important; }
+html.light .light-auth .text-slate-200,
+html.light .light-dashboard .text-slate-200 { color: #1e293b !important; }
+html.light .light-auth .text-slate-400,
+html.light .light-dashboard .text-slate-400 { color: #64748b !important; }
+html.light .light-auth .text-slate-500,
+html.light .light-dashboard .text-slate-500 { color: #64748b !important; }
+html.light .light-auth .text-slate-600,
+html.light .light-dashboard .text-slate-600 { color: #475569 !important; }
+html.light .light-auth .text-slate-300,
+html.light .light-dashboard .text-slate-300 { color: #334155 !important; }
+html.light .light-auth .text-slate-700,
+html.light .light-dashboard .text-slate-700 { color: #334155 !important; }
+html.light .light-auth .text-slate-800,
+html.light .light-dashboard .text-slate-800 { color: #1e293b !important; }
+html.light .light-auth .hover\:text-white:hover,
+html.light .light-dashboard .hover\:text-white:hover { color: #0f172a !important; }
+html.light .light-auth .placeholder-slate-600::placeholder,
+html.light .light-dashboard .placeholder-slate-600::placeholder { color: #94a3b8 !important; }
+html.light .light-auth .placeholder-slate-500::placeholder,
+html.light .light-dashboard .placeholder-slate-500::placeholder { color: #94a3b8 !important; }
+html.light .light-auth .text-primary-300,
+html.light .light-dashboard .text-primary-300 { color: #1d4ed8 !important; }
+html.light .light-auth .text-primary-400,
+html.light .light-dashboard .text-primary-400 { color: #2563eb !important; }
+
+html.light .light-auth .btn-primary,
+html.light .light-dashboard .btn-primary,
+html.light .light-auth .btn-accent,
+html.light .light-dashboard .btn-accent { color: #ffffff !important; }
