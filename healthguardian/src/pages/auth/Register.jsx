@@ -253,9 +253,6 @@ export default function Register() {
 
                 <div className="rounded-xl border border-surface-border bg-surface-muted/50 p-4 space-y-3">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Email verification</p>
-                  <p className="text-xs text-slate-500">
-                    Send a one-time code to your email. If your server requires it (<code className="text-primary-400">REQUIRE_REGISTER_OTP=true</code>), you must enter the code below.
-                  </p>
                   <div className="flex flex-wrap gap-2 items-end">
                     <button
                       type="button"
@@ -334,13 +331,8 @@ export default function Register() {
               </div>
             ) : (
               <div className="rounded-xl border border-surface-border bg-surface-muted/60 px-4 py-3 text-center text-xs text-slate-400">
-                Google Sign-In is not configured yet. Add <code className="text-primary-400">VITE_GOOGLE_CLIENT_ID</code> in frontend
-                <code className="ml-1 text-primary-400">.env</code> and restart the dev server.
               </div>
             )}
-            <p className="mt-2 text-center text-[11px] text-slate-500">
-              Google sign-in creates or opens a patient account. Use standard registration for doctor onboarding.
-            </p>
           </div>
         </div>
       </motion.div>

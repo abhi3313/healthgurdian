@@ -23,6 +23,7 @@ import Settings          from './pages/settings/Settings'
 import DashboardLayout   from './components/common/DashboardLayout'
 import DoctorLayoutGate  from './components/common/DoctorLayoutGate'
 import LandingPage       from './pages/LandingPage'
+import EmergencyAccess   from './pages/EmergencyAccess'
 
 function PrivateRoute({ children, roles }) {
   const { user, token, authReady } = useAuth()
@@ -37,6 +38,7 @@ export default function App() {
     <Routes>
       {/* ── Public ──────────────────────────────────── */}
       <Route path="/"         element={<LandingPage />} />
+      <Route path="/emergency" element={<EmergencyAccess />} />
       <Route path="/login"    element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

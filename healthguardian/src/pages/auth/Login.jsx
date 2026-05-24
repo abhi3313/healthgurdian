@@ -284,13 +284,9 @@ export default function Login() {
               </div>
             ) : (
               <div className="rounded-xl border border-surface-border bg-surface-muted/60 px-4 py-3 text-center text-xs text-slate-400">
-                Google Sign-In is not configured yet. Add <code className="text-primary-400">VITE_GOOGLE_CLIENT_ID</code> in frontend
-                <code className="ml-1 text-primary-400">.env</code> and restart the dev server.
+             
               </div>
             )}
-            <p className="mt-2 text-center text-[11px] text-slate-500">
-              Google creates or opens a patient account. Doctors should register with email and password.
-            </p>
           </div>
 
           <p className="text-center text-sm text-slate-500 mt-6">

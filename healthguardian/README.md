@@ -46,3 +46,15 @@ The app uses `/api` by default, which Vite proxies to the backend configured in 
 ```bash
 npm run build
 ```
+
+## Direct Route Links
+
+This app uses React Router browser history routes such as `/login` and `/register`.
+Production static hosting must rewrite direct page requests back to `index.html`.
+The project includes `vercel.json` for Vercel and `public/_redirects` for Netlify-style hosts.
+
+For backend email links, set the backend `FRONTEND_URL` to the deployed frontend origin, for example:
+
+```env
+FRONTEND_URL=https://your-frontend.vercel.app
+```

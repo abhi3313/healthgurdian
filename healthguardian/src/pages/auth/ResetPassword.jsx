@@ -119,7 +119,7 @@ export default function ResetPassword() {
 
           <h2 className="font-display text-xl font-bold text-white mb-2">Reset password</h2>
           <p className="text-sm text-slate-400 mb-6">
-            Enter a strong password for your local HealthGuardian account.
+            Enter a strong password for your HealthGuardian account.
           </p>
 
           {errors.token && (
