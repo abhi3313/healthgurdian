@@ -147,7 +147,9 @@ export default function TopBar({ onToggleSidebar, role }) {
   }
 
   return (
-    <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-surface-border bg-surface-card/60 backdrop-blur-md z-10">
+    <header className={`h-16 shrink-0 flex items-center justify-between px-6 border-b border-surface-border backdrop-blur-md z-10 ${
+      isDark ? 'bg-surface-card/60' : 'bg-white/90 shadow-sm shadow-slate-200/70'
+    }`}>
       {/* Left */}
       <div className="flex items-center gap-4">
         <button
@@ -163,9 +165,11 @@ export default function TopBar({ onToggleSidebar, role }) {
 
         <div>
           <p className="text-sm font-semibold text-white leading-none">
-            {greeting()}, {user?.name?.split(' ')[0] ?? 'User'} 👋
+            {greeting()}, {user?.name?.split(' ')[0] ?? 'User'} 
           </p>
-          <p className="text-xs text-slate-500 mt-0.5">{formatDate(new Date(), 'EEEE, MMMM dd yyyy')}</p>
+          <p className={isDark ? 'text-xs text-slate-500 mt-0.5' : 'text-xs text-slate-700 mt-0.5 font-medium'}>
+            {formatDate(new Date(), 'EEEE, MMMM, dd yyyy')}
+          </p>
         </div>
       </div>
 
@@ -173,14 +177,16 @@ export default function TopBar({ onToggleSidebar, role }) {
       {hasSearch && (
         <div ref={searchWrapRef} className="hidden md:block relative w-[30rem] max-w-[42vw]">
           <div className="flex items-center gap-2 bg-surface-muted border border-surface-border rounded-xl px-3 py-2">
-            <RiSearchLine className="text-slate-500 text-lg shrink-0" />
+            <RiSearchLine className={isDark ? 'text-slate-500 text-lg shrink-0' : 'text-slate-600 text-lg shrink-0'} />
             <input
               value={searchVal}
               onChange={e => setSearchVal(e.target.value)}
               onFocus={() => setSearchOpen(searchVal.trim().length >= 2)}
               onKeyDown={handleSearchKeyDown}
               placeholder="Search records, appointments, reports..."
-              className="bg-transparent text-sm text-slate-300 placeholder-slate-600 outline-none w-full"
+              className={isDark
+                ? 'bg-transparent text-sm text-slate-300 placeholder-slate-600 outline-none w-full'
+                : 'bg-transparent text-sm text-slate-800 placeholder-slate-500 outline-none w-full'}
             />
           </div>
           {searchOpen && (

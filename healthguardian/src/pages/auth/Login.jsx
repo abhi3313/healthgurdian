@@ -168,7 +168,12 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="label">Password</label>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="label">Password</label>
+                  <Link to="/forgot-password" className="mb-1.5 text-xs font-semibold text-primary-400 hover:text-primary-300">
+                    Forgot Password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <RiLockPasswordLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-lg" />
                   <input

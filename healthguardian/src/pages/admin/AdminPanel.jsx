@@ -15,6 +15,7 @@ import { unwrapData } from '../../services/api'
 import StatCard from '../../components/common/StatCard'
 import { FullPageLoader } from '../../components/common/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import { useTheme } from '../../context/ThemeContext'
 import { getInitials, getAvatarColor, statusColor, formatDate, timeAgo } from '../../utils/helpers'
 import { BLOOD_GROUPS } from '../../utils/constants'
 import toast from 'react-hot-toast'
@@ -26,6 +27,7 @@ const EMPTY_FORM = { name: '', email: '', password: '', role: 'patient', phone: 
 
 export default function AdminPanel() {
   const qc = useQueryClient()
+  const { isDark } = useTheme()
   const [search, setSearch]     = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [addModal, setAddModal] = useState(false)
@@ -100,6 +102,17 @@ export default function AdminPanel() {
     { name: 'Doctors',  value: stats.totalDoctors  ?? 0 },
     { name: 'Admins',   value: stats.totalAdmins   ?? 0 },
   ].filter(d => d.value > 0)
+  const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0)
+  const chartTextColor = isDark ? '#f8fafc' : '#0f172a'
+  const chartMutedColor = isDark ? '#cbd5e1' : '#334155'
+  const chartTooltipStyle = {
+    background: isDark ? '#151e2e' : '#ffffff',
+    border: `1px solid ${isDark ? '#1e2d42' : '#d9e4f3'}`,
+    borderRadius: '12px',
+    color: chartTextColor,
+    fontSize: '12px',
+    boxShadow: isDark ? '0 12px 28px rgba(0,0,0,0.3)' : '0 12px 28px rgba(15,23,42,0.12)',
+  }
 
   const handleCreate = (e) => {
     e.preventDefault()
@@ -203,11 +216,39 @@ export default function AdminPanel() {
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value">
                   {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
+                <text
+                  x="50%"
+                  y="46%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill={chartTextColor}
+                  className="font-display text-2xl font-bold"
+                >
+                  {pieTotal}
+                </text>
+                <text
+                  x="50%"
+                  y="58%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill={chartMutedColor}
+                  className="text-xs font-semibold"
+                >
+                  users
+                </text>
                 <Tooltip
-                  contentStyle={{ background: '#151e2e', border: '1px solid #1e2d42', borderRadius: '12px', fontSize: '12px' }}
-                  labelStyle={{ color: '#94a3b8' }}
+                  contentStyle={chartTooltipStyle}
+                  itemStyle={{ color: chartTextColor, fontWeight: 700 }}
+                  labelStyle={{ color: chartMutedColor }}
                 />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} />
+                <Legend
+                  iconType="circle"
+                  iconSize={8}
+                  formatter={(value) => (
+                    <span style={{ color: chartMutedColor, fontWeight: 700 }}>{value}</span>
+                  )}
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -228,7 +269,13 @@ export default function AdminPanel() {
               type="button"
               onClick={() => refetchSystemHealth()}
               disabled={systemHealthFetching}
-              className="btn-ghost border border-surface-border inline-flex items-center gap-2 px-3 py-2 text-sm"
+              className={clsx(
+                'border border-surface-border inline-flex items-center gap-2 px-3 py-2 text-sm rounded-xl transition-all duration-200 font-medium',
+                isDark
+                  ? 'text-slate-400 hover:text-white hover:bg-surface-muted'
+                  : 'bg-white text-slate-700 hover:text-primary-700 hover:bg-primary-50 hover:border-primary-200',
+                systemHealthFetching && 'opacity-60 cursor-not-allowed',
+              )}
             >
               <RiRefreshLine className={clsx('text-lg', systemHealthFetching && 'animate-spin')} />
               Refresh

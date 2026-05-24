@@ -3,6 +3,8 @@ import { useAuth } from './context/AuthContext'
 
 import Login             from './pages/auth/Login'
 import Register          from './pages/auth/Register'
+import ForgotPassword    from './pages/auth/ForgotPassword'
+import ResetPassword     from './pages/auth/ResetPassword'
 import PatientDashboard  from './pages/patient/PatientDashboard'
 import MyRecords         from './pages/patient/MyRecords'
 import UploadReport      from './pages/patient/UploadReport'
@@ -37,6 +39,8 @@ export default function App() {
       <Route path="/"         element={<LandingPage />} />
       <Route path="/login"    element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       {/* ── Patient ─────────────────────────────────── */}
       <Route path="/patient" element={

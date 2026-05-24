@@ -10,9 +10,21 @@ export function unwrapData(res) {
   return body
 }
 
+function getApiBaseUrl() {
+  const raw = (import.meta.env.VITE_API_BASE_URL || '/api').trim()
+  if (!raw || raw === '/') return '/api'
+
+  const withoutTrailingSlash = raw.replace(/\/+$/, '')
+  if (/^https?:\/\//i.test(withoutTrailingSlash)) {
+    return withoutTrailingSlash.endsWith('/api') ? withoutTrailingSlash : `${withoutTrailingSlash}/api`
+  }
+
+  return withoutTrailingSlash
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 15000,
+  baseURL: getApiBaseUrl(),
+  timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -32,7 +44,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status  = error.response?.status
-    const message = error.response?.data?.message || error.message || 'Something went wrong'
+    const isNetworkError = !error.response && error.message === 'Network Error'
+    const message = isNetworkError
+      ? 'Cannot reach the backend API. Check the deployed API URL and backend CORS settings.'
+      : error.response?.data?.message || error.message || 'Something went wrong'
 
     const silent = error.config?.silent
 

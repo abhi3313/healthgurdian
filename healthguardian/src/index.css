@@ -104,9 +104,29 @@ html.light .input {
 }
 
 html.light .label { color: #64748b; }
-html.light .nav-link { color: #475569; }
-html.light .nav-link:hover { color: #0f172a; background: #e8effa; }
-html.light .nav-link.active { color: #1d4ed8; background: #e8f0ff; border-color: #bfdbfe; }
+html.light .nav-link {
+  color: #334155;
+  border: 1px solid transparent;
+}
+html.light .nav-link svg { color: #475569; }
+html.light .nav-link:hover {
+  color: #0f172a;
+  background: #e8effa;
+  border-color: #cbd8ea;
+}
+html.light .nav-link:hover svg { color: #1d4ed8; }
+html.light .nav-link.active {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+  box-shadow: inset 3px 0 0 #2563eb, 0 8px 18px rgba(37, 99, 235, 0.12);
+}
+html.light .nav-link.active svg { color: #1d4ed8; }
+
+html.light .bg-surface-card\/60 { background-color: rgba(255, 255, 255, 0.9) !important; }
+html.light .bg-surface-muted\/40,
+html.light .bg-surface-muted\/50,
+html.light .bg-surface-muted\/60 { background-color: rgba(238, 243, 251, 0.82) !important; }
 
 html.light .light-auth .text-white,
 html.light .light-dashboard .text-white { color: #0f172a !important; }
@@ -115,11 +135,11 @@ html.light .light-dashboard .text-slate-100 { color: #0f172a !important; }
 html.light .light-auth .text-slate-200,
 html.light .light-dashboard .text-slate-200 { color: #1e293b !important; }
 html.light .light-auth .text-slate-400,
-html.light .light-dashboard .text-slate-400 { color: #64748b !important; }
+html.light .light-dashboard .text-slate-400 { color: #475569 !important; }
 html.light .light-auth .text-slate-500,
-html.light .light-dashboard .text-slate-500 { color: #64748b !important; }
+html.light .light-dashboard .text-slate-500 { color: #475569 !important; }
 html.light .light-auth .text-slate-600,
-html.light .light-dashboard .text-slate-600 { color: #475569 !important; }
+html.light .light-dashboard .text-slate-600 { color: #334155 !important; }
 html.light .light-auth .text-slate-300,
 html.light .light-dashboard .text-slate-300 { color: #334155 !important; }
 html.light .light-auth .text-slate-700,
